@@ -1,0 +1,1070 @@
+.map--embed {
+    pointer-events: none;
+}
+
+.map--demo-suspend {
+    background:
+        radial-gradient(circle at 50% 18%, rgba(47, 128, 237, 0.22), transparent 50%),
+        #0b1220;
+}
+
+.map--demo-suspend .leaflet-container {
+    background: transparent;
+    pointer-events: none;
+}
+
+.map--demo-suspend .leaflet-control-container {
+    display: none;
+}
+
+.map--demo-suspend .map__cursor-coords {
+    display: none !important;
+}
+
+.map--embed .leaflet-control-container {
+    display: none;
+}
+
+.map:not(.map--fullscreen) {
+    position: relative;
+    top: auto;
+    left: auto;
+    width: 100%;
+    height: 100%;
+    z-index: auto;
+    border-radius: inherit;
+    box-shadow: none;
+}
+
+.map__vector-error {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    /* Выше map-fs-topbar (1100) и тулбаров рисования — иначе header перекрывает крестик */
+    z-index: 1300;
+    width: min(92%, 560px);
+    max-width: min(92%, 560px);
+}
+
+.map--fullscreen .map__vector-error {
+    top: calc(var(--fs-top-h, 50px) + 12px);
+}
+
+.map__vector-error .dismissible-banner__close {
+    width: 28px;
+    height: 28px;
+    margin: 0;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #fecaca;
+    border-radius: 6px;
+    background: var(--il-surface);
+    color: #991b1b;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1;
+    opacity: 1;
+}
+
+.map__vector-error .dismissible-banner__close:hover {
+    background: #fecaca;
+}
+
+.map--fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 500;
+    border-radius: 0;
+    box-shadow: none;
+    overflow: hidden;
+    --fs-top-h: 50px;
+    --fs-dock-w: 74px;
+    --fs-panel-w: min(460px, 34vw);
+    --fs-chrome-right: var(--fs-dock-w);
+}
+
+.map__fullscreen-btn {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    right: auto;
+    background-color: rgba(0, 0, 0, 0.62);
+    backdrop-filter: blur(6px);
+    color: #FFFFFF;
+    border: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 520;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
+    transition: background-color 0.2s;
+}
+
+.map__fullscreen-btn:hover {
+    background-color: rgba(0, 141, 210, 0.85);
+}
+
+/* Когда открыта боковая панель — не перекрывать кнопку закрытия ✕ */
+.map__fullscreen-btn--sidebar-open {
+    right: calc(min(34%, 520px) + 15px);
+    left: auto;
+}
+
+.map-split-hud__tools {
+    position: absolute;
+    top: 56px;
+    left: 12px;
+    z-index: 520;
+}
+
+.map-split-hud__tools-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 11px;
+    background: rgba(0, 0, 0, 0.62);
+    backdrop-filter: blur(6px);
+    border-radius: 9px;
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    font-family: inherit;
+}
+
+.map-split-hud__tools-btn--open,
+.map-split-hud__tools-btn--active {
+    background: rgba(0, 141, 210, 0.85);
+}
+
+.map-split-hud__tools .map-fs-tools-menu {
+    left: 0;
+    right: auto;
+    top: calc(100% + 6px);
+}
+
+.map-split-hud__zoom {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 520;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.map-split-hud__btn {
+    width: 34px;
+    height: 34px;
+    border: none;
+    border-radius: 9px;
+    background: rgba(0, 0, 0, 0.62);
+    backdrop-filter: blur(6px);
+    color: #fff;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: inherit;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
+}
+
+.map-split-hud__btn:hover {
+    background: rgba(0, 141, 210, 0.85);
+}
+
+.map:not(.map--fullscreen) .leaflet-control-zoom {
+    display: none;
+}
+
+/* Unified sidebar for fullscreen mode */
+.map__sidebar {
+    position: fixed;
+    right: 0;
+    top: 0;
+    width: 34%;
+    max-width: 520px;
+    height: 100vh;
+    background: var(--il-surface-translucent);
+    backdrop-filter: blur(8px);
+    border-left: 1px solid rgba(0, 0, 0, 0.1);
+    box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    z-index: 500;
+    overflow: hidden;
+}
+
+.map__sidebar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 56px 16px 16px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    flex-shrink: 0;
+}
+
+.map__sidebar-title {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--il-text);
+}
+
+.map__sidebar-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: var(--il-text-muted);
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s, background-color 0.2s;
+}
+
+.map__sidebar-close:hover {
+    color: var(--il-text);
+    background-color: rgba(0, 0, 0, 0.05);
+    border-radius: 4px;
+}
+
+.map__sidebar-section {
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    flex-shrink: 0;
+}
+
+/* In fullscreen "objects" tab can contain long lists (e.g. operational situation),
+   so make this part scrollable instead of clipping content. */
+.map__objects-section {
+    flex: 1 1 auto;
+    flex-shrink: 1;
+    min-height: 0; /* Needed for flex scroll containers */
+    overflow-y: auto;
+}
+
+.map__objects-section .formular__tabs {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--il-surface-translucent);
+    margin-top: 0; /* Keep border/tabs aligned with sidebar padding */
+}
+
+.map__sidebar-subtitle {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--il-text);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Tools section with buttons */
+.map__sidebar-section:first-of-type {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.map__cursor-coords {
+    position: absolute;
+    left: 12px;
+    bottom: 12px;
+    background: rgba(0, 0, 0, 0.62);
+    backdrop-filter: blur(5px);
+    color: #fff;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    z-index: 510;
+}
+
+.situation-map-edit-hint {
+    position: absolute;
+    left: 50%;
+    bottom: 16px;
+    transform: translateX(-50%);
+    z-index: 1000;
+    max-width: min(520px, calc(100% - 32px));
+    text-align: left;
+}
+
+.map--fullscreen .situation-map-edit-hint {
+    bottom: 20px;
+    max-width: min(520px, calc(100vw - min(34%, 520px) - 48px));
+}
+
+.event-point-icon {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+}
+
+.leaflet-marker-icon.event-point-icon {
+    pointer-events: auto !important;
+    z-index: 1200 !important;
+}
+
+.leaflet-marker-icon.event-point-icon * {
+    pointer-events: auto !important;
+}
+
+.event-point-handle {
+    width: 12px;
+    height: 12px;
+    background: #ff9800;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+    cursor: pointer;
+}
+
+.event-point-handle--first {
+    width: 14px;
+    height: 14px;
+    background: #16a34a;
+    border-color: #fff;
+    box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.35), 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+.event-marker-icon {
+    background: transparent;
+    border: none;
+}
+
+.event-marker-icon__wrap {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.event-marker-icon__wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+.event-marker-icon__svg svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.event-marker-icon__fallback {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #2f80ed;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+.event-radius-label {
+    background: transparent !important;
+    border: none !important;
+    pointer-events: none !important;
+    transform: translate(-50%, -50%);
+}
+
+.event-radius-label__inner {
+    background: transparent;
+    color: #1f2937;
+    padding: 0;
+    border-radius: 0;
+    font-size: 0.75rem;
+    font-weight: 600;
+    opacity: 0.65;
+    white-space: nowrap;
+    box-shadow: none;
+    pointer-events: none;
+}
+
+.event-segment-label {
+    background: transparent !important;
+    border: none !important;
+    pointer-events: none !important;
+    transform: translate(-50%, -50%);
+}
+
+.event-segment-label__inner {
+    background: transparent;
+    color: #1f2937;
+    padding: 0;
+    border-radius: 0;
+    font-size: 0.7rem;
+    font-weight: 600;
+    opacity: 0.6;
+    white-space: nowrap;
+    box-shadow: none;
+    pointer-events: none;
+}
+
+.event-popup {
+    pointer-events: auto;
+}
+
+.event-popup .leaflet-popup-content-wrapper,
+.event-popup .leaflet-popup-tip,
+.event-popup .leaflet-popup-close-button {
+    pointer-events: auto;
+}
+
+/* Objects section - scrollable */
+.map__objects-section {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    min-height: 0;
+}
+
+.map__objects-section::-webkit-scrollbar {
+    width: 6px;
+}
+
+.map__objects-section::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.map__objects-section::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+}
+
+.map__objects-section::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+/* Features section at bottom */
+.map__features-section {
+    border-bottom: none;
+    max-height: 300px;
+    overflow-y: auto;
+    flex-shrink: 0;
+    margin-bottom: 16px;
+}
+
+.map__features-section::-webkit-scrollbar {
+    width: 6px;
+}
+
+.map__features-section::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.map__features-section::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+}
+
+/* Measurement mode button */
+.map__measure-btn {
+    background-color: var(--il-surface);
+    border: 2px solid #008dd2;
+    color: #008dd2;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.map__measure-btn:hover {
+    background-color: var(--il-primary-tint);
+    border-color: #0076b3;
+    color: #0076b3;
+}
+
+.map__measure-btn--active {
+    background-color: #008dd2;
+    color: #fff;
+    border-color: #008dd2;
+}
+
+.map__measure-btn--active:hover {
+    background-color: #0076b3;
+    border-color: #0076b3;
+}
+
+/* Measurement menu wrapper */
+.map__measure-menu-wrapper {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+}
+
+.map__measure-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.map__measure-menu-arrow {
+    display: inline-block;
+    transition: transform 0.2s;
+    font-size: 12px;
+    margin-left: 8px;
+}
+
+.map__measure-menu-arrow--open {
+    transform: rotate(180deg);
+}
+
+/* Measurement menu */
+.map__measure-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin-top: 4px;
+    background: var(--il-surface);
+    border: 1px solid var(--il-border);
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+    overflow: hidden;
+}
+
+.map__measure-menu-item {
+    display: block;
+    width: 100%;
+    padding: 10px 16px;
+    background: none;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--il-text);
+    transition: background-color 0.2s;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.map__measure-menu-item:last-child {
+    border-bottom: none;
+}
+
+.map__measure-menu-item:hover:not(:disabled) {
+    background-color: var(--il-hover);
+}
+
+.map__measure-menu-item:disabled {
+    color: #ccc;
+    cursor: not-allowed;
+    background-color: var(--il-surface-2);
+}
+
+.map__cluster-legend {
+    margin: 0;
+    padding: 8px 12px 4px;
+    font-size: 12px;
+    color: var(--il-text-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px 10px;
+    flex-wrap: wrap;
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.map__cluster-legend-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 1px solid #fff;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
+}
+
+.leaflet-tooltip.map-bubble-single-tooltip {
+    pointer-events: none;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    color: rgba(20, 20, 20, 0.72);
+    font-weight: 600;
+    font-size: 12px;
+    line-height: 1.25;
+    max-width: 140px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 0 2px;
+    text-shadow:
+        0 0 3px rgba(255, 255, 255, 0.85),
+        0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+.leaflet-tooltip.map-bubble-single-tooltip::before {
+    display: none;
+}
+
+.map__cluster-legend-dot--flag {
+    background: #2563eb;
+}
+
+.map__cluster-legend-dot--nonflag {
+    background: #ea580c;
+}
+
+.map__sidebar-toggle {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    width: 50px;
+    height: 50px;
+    background-color: var(--il-surface-translucent);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 24px;
+    color: var(--il-text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s;
+    z-index: 499;
+}
+
+.map__sidebar-toggle:hover {
+    background-color: var(--il-surface);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transform: scale(1.05);
+}
+
+.leaflet-bottom {
+    display: none;
+}
+
+:root {
+    --border-color: var(--il-text);
+    --text-color: var(--il-text);
+}
+
+/* Border / text (общие для SVG-маркеров) */
+.stroke__border-color {stroke: var(--border-color);}
+.fill__text-color {fill: var(--text-color);}
+
+/* Палитра маркера: цвета задаются inline на .marker-palette (--marker-c1 … c4) */
+.marker-palette .stop-color__first-color { stop-color: var(--marker-c1); }
+.marker-palette .stop-color__second-color { stop-color: var(--marker-c2); }
+.marker-palette .stop-color__third-color { stop-color: var(--marker-c3); }
+.marker-palette .stop-color__forth-color { stop-color: var(--marker-c4); }
+.marker-palette .fill__first-color { fill: var(--marker-c1); }
+.marker-palette .fill__second-color { fill: var(--marker-c2); }
+.marker-palette .fill__third-color { fill: var(--marker-c3); }
+.marker-palette .fill__forth-color { fill: var(--marker-c4); }
+.marker-palette .stroke__first-color { stroke: var(--marker-c1); }
+
+/* Стили для флаговых маркеров */
+.custom-marker-label {
+    transition: transform 0.3s ease, filter 0.3s ease;
+    position: relative;
+    pointer-events: none; /* Отключаем события на всём контейнере */
+}
+
+.custom-marker-label:hover {
+    transform: translateY(var(--marker-offset-y, 0)) scale(1.15) !important;
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+    z-index: 1000 !important;
+}
+
+/* SVG маркер не интерактивен */
+.svg-marker {
+    pointer-events: none;
+}
+
+/* Только текстовая подпись интерактивна */
+.marker-label {
+    position: absolute;
+    display: block;
+    right: 5px;
+    box-sizing: border-box;
+    font-weight: 700;
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    pointer-events: auto;
+    cursor: pointer;
+}
+
+/* Родительский контейнер Leaflet для флаговых маркеров */
+.leaflet-marker-icon.custom-div-icon {
+    position: relative !important;
+    z-index: 200 !important; /* Выше, чем non-flag маркеры */
+    transition: z-index 0s;
+    pointer-events: none !important;
+}
+
+.leaflet-marker-icon.custom-div-icon:hover {
+    z-index: 1000 !important;
+}
+
+/* Стили для non-flag маркеров */
+.non-flag-marker {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+    cursor: pointer;
+    transition: transform 0.3s ease, filter 0.3s ease;
+    position: relative;
+}
+
+.non-flag-marker:hover {
+    transform: scale(1.15);
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+    z-index: 1000 !important;
+}
+
+.non-flag-div-icon {
+    background-color: transparent !important;
+    border: none !important;
+}
+
+/* Родительский контейнер Leaflet для non-flag маркеров */
+.leaflet-marker-icon.non-flag-div-icon {
+    /* position: relative was not here, but related rules cleaned for consistency */
+    z-index: 100 !important; /* Ниже, чем флаговые маркеры */
+    transition: z-index 0s;
+    pointer-events: none !important; /* По умолчанию не блокируем события */
+}
+
+/* Разрешаем события только на самом маркере */
+.leaflet-marker-icon.non-flag-div-icon .non-flag-marker {
+    pointer-events: auto;
+}
+
+.leaflet-marker-icon.non-flag-div-icon:hover {
+    z-index: 1000 !important; /* При hover поднимаем наверх */
+    pointer-events: auto !important;
+}
+
+/* Стили для групповых маркеров */
+.group-marker {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+    transition: transform 0.3s ease, filter 0.3s ease;
+    position: relative;
+}
+
+.group-marker:hover {
+    /* transform: scale(1.15); removed to prevent visual shift of the group icon when the hover circle appears.
+       Scaling was causing the group marker to appear lower relative to the positioned circle members. */
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+    z-index: 1000 !important;
+}
+
+.group-marker:hover svg circle:first-of-type {
+    opacity: 1 !important;
+    filter: brightness(1.2);
+}
+
+.group-div-icon {
+    background-color: transparent !important;
+    border: none !important;
+}
+
+/* Родительский контейнер Leaflet для групповых маркеров */
+.leaflet-marker-icon.group-div-icon {
+    /* position: relative !important; removed — it was interfering with Leaflet's absolute positioning + transform of the marker icon, causing the group graphic to render far from its intended geographic anchor (e.g. visual at ~32° while data at 36.5°). */
+    z-index: 150 !important; /* Между non-flag и флаговыми маркерами */
+    transition: z-index 0s;
+}
+
+.leaflet-marker-icon.group-div-icon:hover {
+    z-index: 1000 !important;
+}
+
+/* Круг элементов группы при hover */
+.group-circle-container {
+    position: absolute;
+    width: 200px;
+    height: 200px;
+    border-radius: 50%;
+    border: 2px dashed rgba(255, 107, 107, 0.5);
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.3s ease;
+    z-index: 400;
+}
+
+.group-circle-item {
+    position: absolute;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.3s ease, filter 0.3s ease;
+}
+
+.group-circle-item:hover {
+    transform: scale(1.2);
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Стили для элементов в круге */
+.circle-item-marker {
+    animation: fadeIn 0.3s ease;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+    transition: transform 0.3s ease, filter 0.3s ease;
+    position: relative;
+}
+
+.circle-item-marker:hover {
+    transform: scale(1.15);
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.4));
+    z-index: 1000 !important;
+}
+
+.circle-item-div-icon {
+    background-color: transparent !important;
+    border: none !important;
+}
+
+/* Родительский контейнер Leaflet для элементов круга */
+.leaflet-marker-icon.circle-item-div-icon {
+    /* position: relative !important; removed — same reason as group icons: interferes with Leaflet marker placement */
+    z-index: 300 !important; /* Выше всех остальных, так как это интерактивные элементы */
+    transition: z-index 0s;
+}
+
+.leaflet-marker-icon.circle-item-div-icon:hover {
+    z-index: 1000 !important;
+}
+
+.measure-marker {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+}
+
+.measure-marker__circle {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #008dd2;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 13px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.measure-total-label {
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000 !important;
+}
+
+.measure-total-label__text {
+    background: rgba(255, 107, 107, 0.9);
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+/* Анимация зон действия */
+
+/* Анимация "бегущего" пунктира на границе круга */
+@keyframes actionRadiusDash {
+    0% {
+        stroke-dashoffset: 0;
+    }
+    100% {
+        stroke-dashoffset: 30;
+    }
+}
+
+/* Анимация пульсации для кругов зон действия через CSS */
+@keyframes actionRadiusPulse {
+    0% {
+        stroke-opacity: 0.8;
+        stroke-width: 2;
+    }
+    100% {
+        stroke-opacity: 0;
+        stroke-width: 1;
+    }
+}
+
+.action-radius-pulse-css-1 path {
+    animation: actionRadiusPulse 3s ease-out infinite;
+}
+
+.action-radius-pulse-css-2 path {
+    animation: actionRadiusPulse 3s ease-out infinite;
+    animation-delay: 1.5s;
+}
+
+/* === Линейка масштаба (топографическая, двухцветная) — только fullscreen, низ по центру === */
+.map-scale-bar {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 650;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: var(--il-surface-translucent);
+    padding: 2px 10px 4px;
+    border-radius: 3px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+    pointer-events: none; /* не мешает взаимодействию с картой */
+    font-family: inherit;
+    user-select: none;
+}
+
+.map-scale-bar--ruler-only {
+    gap: 4px;
+}
+
+.map-scale-ruler {
+    display: flex;
+    align-items: stretch;
+    border: 1px solid #3a4654;
+    overflow: hidden;
+    background: var(--il-surface); /* fallback */
+}
+
+.map-scale-labels {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    box-sizing: border-box;
+    align-self: stretch;
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--il-text);
+    margin-top: 2px;
+    padding: 0 1px;
+    white-space: nowrap;
+}
+
+.map-scale-labels span:first-child {
+    text-align: left;
+}
+
+.map-scale-labels span:last-child {
+    text-align: right;
+}
+
+/* === Интерактивный выбор масштаба (дропдаун по клику на numeric) === */
+.map-scale-bar {
+    /* Делаем контейнер containing block для абсолютного позиционирования дропдауна (вверх или вниз) */
+    position: absolute;
+}
+
+.map-scale-numeric {
+    cursor: pointer;
+    pointer-events: auto;
+    transition: background-color 80ms ease, opacity 80ms ease;
+}
+
+.map-scale-numeric:hover {
+    background-color: rgba(31, 42, 56, 0.06);
+    border-radius: 2px;
+}
+
+.map-scale-dropdown {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-bottom: 4px;
+    background: var(--il-surface-translucent);
+    border: 1px solid #3a4654;
+    border-radius: 3px;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
+    z-index: 670; /* выше самой линейки, но ниже попапов */
+    min-width: 92px;
+    max-height: 260px;
+    overflow-y: auto;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--il-text);
+    pointer-events: auto;
+    user-select: none;
+}
+
+.map-scale-option {
+    padding: 3px 10px;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.map-scale-option:hover {
+    background-color: #e8eaec;
+}
+
+.map-scale-option--active {
+    font-weight: 700;
+    background-color: #d4d8dc;
+}
+
+.map-scale-option--active:hover {
+    background-color: #c9ced3;
+}
+
+.leaflet-popup.zone-action-popup .leaflet-popup-content {
+    margin: 10px 12px;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--il-text);
+}
+
+.zone-action-popup__content strong {
+    font-size: 13px;
+}

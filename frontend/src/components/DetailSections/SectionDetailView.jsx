@@ -1,0 +1,155 @@
+import AttachmentGallery from './AttachmentGallery';
+import DeployedEquipmentDisplay from '../TargetEquipment/DeployedEquipmentDisplay';
+import SubordinationTree from './SubordinationTree';
+import FormularCompletionCard from './FormularCompletionCard';
+import TargetZonesPreviewCard from './TargetZonesPreviewCard';
+import TargetVulnerabilitiesCard from './TargetVulnerabilitiesCard';
+import PersonDetailView from './PersonDetailView';
+import MarkdownContent from '../common/MarkdownEditor/MarkdownContent';
+import { itemHasVisibleContent } from '../../utils/organizeSectionData';
+import './DetailSections.css';
+
+function SectionContent({ item, attachmentsBySection }) {
+  const section = item.section;
+  const attachments = attachmentsBySection[section.id] || [];
+
+  return (
+    <article className="detail-sections__block">
+      {!section.is_hidden && (
+        <h3 className="detail-sections__block-title">{section.title}</h3>
+      )}
+      {item.content && (
+        <MarkdownContent className="detail-sections__block-content">
+          {item.content}
+        </MarkdownContent>
+      )}
+      <AttachmentGallery attachments={attachments} />
+    </article>
+  );
+}
+
+export default function SectionDetailView({
+  card,
+  attachmentsBySection = {},
+  onSubordinateFlyTo,
+  onSubordinateOpenDetails,
+  onEditEquipmentInCatalog,
+  onTargetOpenDetails,
+  initialPersonId,
+  targetZonePreview,
+  vulnerabilityPreview,
+}) {
+  if (!card) return null;
+
+  if (card.kind === 'section') {
+    return (
+      <div className="detail-sections__detail">
+        <SectionContent item={card.payload.item} attachmentsBySection={attachmentsBySection} />
+      </div>
+    );
+  }
+
+  if (card.kind === 'group') {
+    const { group } = card.payload;
+
+    return (
+      <div className="detail-sections__detail">
+        {!group.parent?.is_hidden && (
+          <h3 className="detail-sections__group-title">{group.parent?.title}</h3>
+        )}
+        {group.children
+          .filter((item) => itemHasVisibleContent(item, attachmentsBySection))
+          .map((item) => (
+          <SectionContent
+            key={item.section.id}
+            item={item}
+            attachmentsBySection={attachmentsBySection}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  if (card.kind === 'equipment') {
+    return (
+      <div className="detail-sections__detail detail-sections__detail--equipment">
+        <h3 className="detail-sections__group-title">{card.title}</h3>
+        <DeployedEquipmentDisplay
+          items={card.payload.items || []}
+          onEditInCatalog={onEditEquipmentInCatalog}
+          hideTitle
+        />
+      </div>
+    );
+  }
+
+  if (card.kind === 'subordinates') {
+    return (
+      <div className="detail-sections__detail">
+        <h3 className="detail-sections__group-title">{card.title}</h3>
+        <SubordinationTree
+          parent={card.payload.parent}
+          subordinates={card.payload.subordinates || []}
+          onSubordinateFlyTo={onSubordinateFlyTo}
+          onSubordinateOpenDetails={onSubordinateOpenDetails}
+          hideTitle
+        />
+      </div>
+    );
+  }
+
+  if (card.kind === 'formular-completion') {
+    return (
+      <div className="detail-sections__detail">
+        <h3 className="detail-sections__group-title">{card.title}</h3>
+        <FormularCompletionCard
+          sections={card.payload.sections || []}
+          targets={card.payload.targets || []}
+          onTargetOpenDetails={onTargetOpenDetails}
+        />
+      </div>
+    );
+  }
+
+  if (card.kind === 'persons') {
+    return (
+      <div className="detail-sections__detail">
+        <h3 className="detail-sections__group-title">{card.title}</h3>
+        <PersonDetailView
+          persons={card.payload.persons || []}
+          initialPersonId={initialPersonId}
+        />
+      </div>
+    );
+  }
+
+  if (card.kind === 'target-zones') {
+    return (
+      <div className="detail-sections__detail">
+        <h3 className="detail-sections__group-title">{card.title}</h3>
+        <TargetZonesPreviewCard
+          zones={targetZonePreview?.zones || []}
+          enabledKeys={targetZonePreview?.enabledKeys}
+          onToggleZone={targetZonePreview?.onToggleZone}
+          onShowAll={targetZonePreview?.onShowAll}
+          onHideAll={targetZonePreview?.onHideAll}
+        />
+      </div>
+    );
+  }
+
+  if (card.kind === 'vulnerabilities') {
+    return (
+      <div className="detail-sections__detail">
+        <h3 className="detail-sections__group-title">{card.title}</h3>
+        <TargetVulnerabilitiesCard
+          items={vulnerabilityPreview?.items || []}
+          showOnMap={vulnerabilityPreview?.showOnMap}
+          onShowOnMapChange={vulnerabilityPreview?.onShowOnMapChange}
+        />
+      </div>
+    );
+  }
+
+  return null;
+}

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="47" height="47" viewBox="0 0 190.25 190.25">
+ <defs>
+     <clipPath id="id0">
+      <path d="M-0 0l190.25 0 0 190.25 -190.25 0 0 -190.25z"/>
+     </clipPath>
+ </defs>
+ <g id="Слой_x0020_1">
+  <g id="_2218155641024">
+   <circle class="stroke__first-color" fill="#FEFEFE" stroke-width="6.52" stroke-miterlimit="22.9256" cx="87.29" cy="86.76" r="69.91"/>
+   <line fill="none" stroke="#2B2A29" stroke-width="6.52" stroke-miterlimit="22.9256" x1="60.84" y1="73.72" x2="26.08" y2= "73.72" />
+   <line fill="none" stroke="#2B2A29" stroke-width="6.52" stroke-miterlimit="22.9256" x1="60.61" y1="100.96" x2="25.86" y2= "100.96" />
+   <line fill="none" stroke="#2B2A29" stroke-width="6.52" stroke-miterlimit="22.9256" x1="144.33" y1="73.48" x2="109.58" y2= "73.48" />
+   <line fill="none" stroke="#2B2A29" stroke-width="6.52" stroke-miterlimit="22.9256" x1="144.11" y1="100.72" x2="109.36" y2= "100.72" />
+   <line fill="none" stroke="#2B2A29" stroke-width="2.61" stroke-miterlimit="22.9256" x1="60.55" y1="53.42" x2="59.68" y2= "122.19" />
+   <line fill="none" stroke="#2B2A29" stroke-width="2.61" stroke-miterlimit="22.9256" x1="109.75" y1="54.29" x2="108.88" y2= "123.06" />
+   <line fill="none" stroke="#2B2A29" stroke-width="2.61" stroke-miterlimit="22.9256" stroke-dasharray="5.219915 2.609957" x1="61.55" y1="61.05" x2="109.66" y2= "61.65" />
+   <line fill="none" stroke="#2B2A29" stroke-width="2.61" stroke-miterlimit="22.9256" stroke-dasharray="5.219915 2.609957" x1="60.23" y1="113.83" x2="108.33" y2= "114.44" />
+  </g>
+ </g>
+</svg>

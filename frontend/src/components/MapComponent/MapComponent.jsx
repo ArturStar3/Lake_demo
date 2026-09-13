@@ -1,0 +1,3000 @@
+import { MapContainer, TileLayer, GeoJSON, Marker, Popup, useMapEvents, Polyline, useMap, Polygon, Circle } from "react-leaflet";
+import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+
+
+import LabelGeneration from "./MapUtils";
+import NonFlagLabelGeneration from "./NonFlagMarkerUtils";
+import ActionRadiusLegendButton from "./ActionRadiusLegendButton";
+import ActionZonesLayer from "./ActionZonesLayer";
+import MapVectorBaseLayer from "./MapVectorBaseLayer";
+import MapOverlayLayers from "./MapOverlayLayers";
+import { useMapOverlayLayers } from "../../hooks/useMapOverlayLayers";
+import ZoneHoverListPanel from "./ZoneHoverListPanel";
+import ZoneActionPopupManager, { buildZonePopupPayload } from "./ZoneActionPopupManager";
+import { createZoneHoverController } from "../../utils/zoneHoverController";
+import CountryModal from "../CountryModal/CountryModal";
+import AddEventModal from "../Events/AddEventModal";
+import MarkdownContent from "../common/MarkdownEditor/MarkdownContent";
+import DismissibleBanner from "../common/DismissibleBanner/DismissibleBanner";
+import EventDrawingToolbar from "./EventDrawingToolbar";
+import SituationDrawingToolbar from "./SituationDrawingToolbar";
+import OperationalSituationLayer from "./OperationalSituationLayer";
+import SituationDetailPanel from "../OperationalSituation/SituationDetailPanel";
+import { filterRevisionsForSituation } from "../../utils/situationUtils";
+import InundationDrawBanner from "./InundationDrawBanner";
+import EventDraftLayer from "./EventDraftLayer";
+import { useEventDrawing } from "../../hooks/map/useEventDrawing";
+import { drawPointsToEditable, editablePointsKey, drawPointsKey, EMPTY_DRAW_POINTS, parseLatLngPoints, validateEditablePolygonPoints } from "../../utils/polygonDrawUtils";
+import { calcDistanceMeters } from "../../utils/geoUtils";
+import { isFlagMarker, isNonFlagMarker } from "../../utils/markerFilters";
+import { getGroupCirclePositions, setRuntimeClusterDistancePx } from "./markerClusteringUtils";
+import BubbleClusterLayer from "./BubbleClusterLayer";
+import VulnerabilityPointsLayer from "./VulnerabilityPointsLayer";
+import {
+  filterFlagObjectsForZoom,
+  shouldShowNonFlagMarkers,
+  loadMapClusterMode,
+  saveMapClusterMode,
+  DEFAULT_MAP_DISPLAY_ZOOM_RULES,
+} from "../../utils/mapDisplaySettings";
+import { TILE_RASTER_URL, USE_VECTOR_MAP } from "../../config/tiles";
+import { useMapViewportMarkers } from "../../hooks/useMapViewportMarkers";
+import { clearMarkerIconCache } from "../../utils/markerIconCache";
+import { getCountryMarkerPalette } from "../../utils/markerPalette";
+import { ensureNonFlagIconsForObjects } from "../../utils/markerIconFactory";
+import { resolveMediaUrl } from "../../utils/mediaUrl";
+import MapFullscreenTopBar from "./MapFullscreenTopBar";
+import MapFullscreenDock from "./MapFullscreenDock";
+import MapFullscreenPanel from "./MapFullscreenPanel";
+import MapFullscreenPanelBody, { MapFullscreenPanelFeatures } from "./MapFullscreenPanelBody";
+import MapSplitHud from "./MapSplitHud";
+import MapSearchControl from "./MapSearchControl";
+import { findCountryFeature } from "../../utils/mapSearchUtils";
+import { MapFullscreenMeasureBanner } from "./MapFullscreenZoomControls";
+import "./MapComponent.css";
+import "./MapFullscreen.css";
+import { applyDemoEffectCssVars, demoEffectClassName, demoEffectCssVars, demoMarkerIconClass, resolveEventDemoEffect } from "./demo/eventDemoAnimations";
+import { applyObjectDemoEffect, objectDemoMarkerKeySuffix, resolveObjectDemoEffect } from "./demo/objectDemoAnimations";
+import "./demo/DemoAnimations.css";
+import { setDemoAnimationMap } from "./demo/demoRafDriver";
+import DemoPlaybackBar from "../DemoMode/DemoPlaybackBar";
+import DemoTextMapEditor from "../DemoMode/DemoTextMapEditor";
+import DemoTextLayer from "./demo/DemoTextLayer";
+import { alignDemoText } from "../../utils/demoScenario";
+import { buildVisibleZones } from "../../utils/buildVisibleZones";
+
+// delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+    iconRetinaUrl: "/leaflet/marker-icon-2x.png",
+    iconUrl: "/leaflet/marker-icon.png",
+    shadowUrl: "/leaflet/marker-shadow.png",
+});
+
+const MemoGeoJSON = React.memo(GeoJSON);
+const EMPTY_VISIBLE_ZONES = [];
+
+/**
+ * Иконки событий кэшируются по маркеру и активному эффекту демонстрации:
+ * пересоздание divIcon на каждом рендере сбрасывало бы CSS-анимацию мигания.
+ */
+const eventMarkerIconCache = new Map();
+
+function getEventMarkerIconCached({ markerId, path, svg, demoEffect }) {
+    const demoClass = demoMarkerIconClass(demoEffect);
+    const durationKey = demoEffect
+        ? `${demoEffect.durationMs ?? ""}|${demoEffect.continuous ? "1" : "0"}|${demoEffect.repeat ?? ""}|${demoEffect.runId ?? ""}`
+        : "";
+    const cacheKey = `${markerId ?? path ?? "fallback"}|${svg ? "svg" : "img"}|${demoClass}|${durationKey}`;
+    const cached = eventMarkerIconCache.get(cacheKey);
+    if (cached) return cached;
+
+    const cssVars = demoEffect ? demoEffectCssVars(demoEffect) : "";
+    const content = svg
+        ? `<div class="event-marker-icon__wrap event-marker-icon__svg" style="${cssVars}">${svg}</div>`
+        : path
+            ? `<div class="event-marker-icon__wrap" style="${cssVars}"><img src="${path}" alt="event-marker" /></div>`
+            : `<div class="event-marker-icon__fallback" style="${cssVars}"></div>`;
+    const icon = L.divIcon({
+        className: `event-marker-icon${demoClass}`,
+        html: content,
+        iconSize: [28, 28],
+        iconAnchor: [14, 28],
+    });
+    eventMarkerIconCache.set(cacheKey, icon);
+    return icon;
+}
+
+const LAYER_NON_INTERACTIVE = Object.freeze({ interactive: false, bubblingMouseEvents: false });
+const MEASURE_SEGMENT_STYLE = Object.freeze({ color: "#008DD2", weight: 2, dashArray: "6,4" });
+const MEASURE_TOTAL_STYLE = Object.freeze({ color: "#FF6B6B", weight: 1, opacity: 0.6 });
+
+const measureIconCache = new Map();
+function getMeasureIcon(label) {
+    const key = String(label);
+    let icon = measureIconCache.get(key);
+    if (icon) return icon;
+    icon = L.divIcon({
+        className: "measure-marker",
+        html: `<div class="measure-marker__circle">${label}</div>`,
+        iconSize: [28, 28],
+        iconAnchor: [14, 14],
+    });
+    measureIconCache.set(key, icon);
+    return icon;
+}
+
+const measureTotalIconCache = new Map();
+function getMeasureTotalIcon(text) {
+    let icon = measureTotalIconCache.get(text);
+    if (icon) return icon;
+    icon = L.divIcon({
+        className: "measure-total-label",
+        html: `<div class="measure-total-label__text">${text}</div>`,
+        iconSize: [60, 24],
+        iconAnchor: [30, 12],
+    });
+    measureTotalIconCache.set(text, icon);
+    return icon;
+}
+
+function formatDistance(meters) {
+    if (!meters) return "0 м";
+    return meters >= 1000 ? `${(meters / 1000).toFixed(2)} км` : `${meters.toFixed(0)} м`;
+}
+
+function getEventShapeCentroid(shape) {
+    if (!shape?.geometry) return null;
+    if (shape.type === "point" || shape.type === "circle") {
+        return [shape.geometry.lat, shape.geometry.lng];
+    }
+    if (shape.type === "area" && shape.geometry.points?.length > 0) {
+        const pts = shape.geometry.points;
+        let lat = 0;
+        let lng = 0;
+        for (let i = 0; i < pts.length; i += 1) {
+            lat += pts[i].lat;
+            lng += pts[i].lng;
+        }
+        return [lat / pts.length, lng / pts.length];
+    }
+    return null;
+}
+
+const circleFallbackIconCache = new Map();
+function getCircleFallbackIcon(fill) {
+    let icon = circleFallbackIconCache.get(fill);
+    if (icon) return icon;
+    icon = L.divIcon({
+        html: `<div class="circle-item-marker" style="cursor: pointer; opacity: 0.9;"><svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" width="40" height="40"><circle cx="20" cy="20" r="18" fill="${fill}" stroke="#FFFFFF" stroke-width="2"/></svg></div>`,
+        className: "circle-item-div-icon",
+        iconSize: [40, 40],
+        iconAnchor: [20, 20],
+    });
+    circleFallbackIconCache.set(fill, icon);
+    return icon;
+}
+
+const EventPopup = React.memo(function EventPopup({ eventItem }) {
+    const dateLabel = eventItem.date_start
+        ? `с ${eventItem.date_start}${eventItem.date_end ? ` по ${eventItem.date_end}` : ""}`
+        : "—";
+    const timeLabel = eventItem.time_start
+        ? `с ${eventItem.time_start}${eventItem.time_end ? ` по ${eventItem.time_end}` : ""}`
+        : "—";
+    const description = eventItem.description?.trim() || "";
+    return (
+        <Popup
+            autoPan={false}
+            closeOnClick={false}
+            className="event-popup"
+            eventHandlers={{
+                click: (e) => e.originalEvent?.stopPropagation(),
+                mousedown: (e) => e.originalEvent?.stopPropagation(),
+            }}
+        >
+            <div
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+            >
+                <strong>{eventItem.title || "Событие"}</strong>
+                <br />
+                Объект: {eventItem.object_name || "—"}
+                <br />
+                Страна: {eventItem.country?.title || "—"}
+                <br />
+                Дата: {dateLabel}
+                <br />
+                Время: {timeLabel}
+                <br />
+                Доп. информация:{' '}
+                {description ? (
+                    <MarkdownContent variant="popup">{description}</MarkdownContent>
+                ) : (
+                    '—'
+                )}
+            </div>
+        </Popup>
+    );
+});
+
+const EventShapeLayer = React.memo(function EventShapeLayer({
+    eventItem,
+    markerSvg,
+    isMapDrawingActive,
+    demoAnimation,
+}) {
+    const shape = eventItem?.shape;
+    const eventColor = eventItem.color || "#2f80ed";
+    const demoEventEffect = resolveEventDemoEffect(eventItem, demoAnimation);
+    const shapeClassName = demoEffectClassName(demoEventEffect) || undefined;
+    const pathOptions = useMemo(() => ({
+        color: eventColor,
+        fillColor: eventColor,
+        fillOpacity: 0.2,
+        weight: 1,
+        className: shapeClassName,
+    }), [eventColor, shapeClassName]);
+    const demoShapeHandlers = useMemo(
+      () => (demoEventEffect
+          ? { add: (e) => applyDemoEffectCssVars(e.target, demoEventEffect) }
+          : undefined),
+      [demoEventEffect],
+    );
+    const demoShapeKey = demoEventEffect
+        ? `${demoEventEffect.effect}-${demoEventEffect.runId}-${demoEventEffect.repeat ?? 0}`
+        : 'static';
+    const polygonPositions = useMemo(
+        () => (shape?.type === "area" && shape.geometry?.points
+            ? shape.geometry.points.map((p) => [p.lat, p.lng])
+            : null),
+        [shape],
+    );
+
+    if (!shape || !shape.type) return null;
+
+    const layerInteraction = isMapDrawingActive ? LAYER_NON_INTERACTIVE : undefined;
+    const markerPath = resolveMediaUrl(eventItem.marker?.path);
+    const icon = getEventMarkerIconCached({
+        markerId: eventItem.marker?.id,
+        path: markerPath,
+        svg: markerSvg,
+        demoEffect: demoEventEffect,
+    });
+    const markerPosition = getEventShapeCentroid(shape);
+    const popup = <EventPopup eventItem={eventItem} />;
+
+    if (shape.type === "point" && shape.geometry) {
+        return (
+            <Marker
+                position={[shape.geometry.lat, shape.geometry.lng]}
+                icon={icon}
+                {...layerInteraction}
+            >
+                {popup}
+            </Marker>
+        );
+    }
+
+    if (shape.type === "circle" && shape.geometry) {
+        return (
+            <>
+                <Circle
+                    key={`circle-${demoShapeKey}`}
+                    center={[shape.geometry.lat, shape.geometry.lng]}
+                    radius={shape.geometry.radius || 0}
+                    pathOptions={pathOptions}
+                    eventHandlers={demoShapeHandlers}
+                    {...layerInteraction}
+                >
+                    {popup}
+                </Circle>
+                {markerPosition && (
+                    <Marker
+                        position={markerPosition}
+                        icon={icon}
+                        {...layerInteraction}
+                    />
+                )}
+            </>
+        );
+    }
+
+    if (shape.type === "area" && polygonPositions?.length) {
+        return (
+            <>
+                <Polygon
+                    key={`area-${demoShapeKey}`}
+                    positions={polygonPositions}
+                    pathOptions={pathOptions}
+                    eventHandlers={demoShapeHandlers}
+                    {...layerInteraction}
+                >
+                    {popup}
+                </Polygon>
+                {markerPosition && (
+                    <Marker
+                        position={markerPosition}
+                        icon={icon}
+                        {...layerInteraction}
+                    />
+                )}
+            </>
+        );
+    }
+
+    return null;
+});
+
+const MeasureOverlay = React.memo(function MeasureOverlay({ points }) {
+    if (!points?.length) return null;
+    const last = points[points.length - 1];
+    const totalText = formatDistance(points.reduce((sum, p) => sum + (p.distance || 0), 0));
+    return (
+        <>
+            {points.map((point, idx) => {
+                if (idx === 0) return null;
+                const prev = points[idx - 1];
+                return (
+                    <Polyline
+                        key={`measure-line-${point.id}`}
+                        positions={[[prev.lat, prev.lng], [point.lat, point.lng]]}
+                        pathOptions={MEASURE_SEGMENT_STYLE}
+                    />
+                );
+            })}
+            {points.length >= 2 && (
+                <>
+                    <Polyline
+                        key="measure-total-line"
+                        positions={[[points[0].lat, points[0].lng], [last.lat, last.lng]]}
+                        pathOptions={MEASURE_TOTAL_STYLE}
+                    />
+                    <Marker
+                        key="measure-total-label"
+                        position={[
+                            (points[0].lat + last.lat) / 2,
+                            (points[0].lng + last.lng) / 2,
+                        ]}
+                        icon={getMeasureTotalIcon(totalText)}
+                        interactive={false}
+                    />
+                </>
+            )}
+            {points.map((point) => (
+                <Marker
+                    key={`measure-point-${point.id}`}
+                    position={[point.lat, point.lng]}
+                    icon={getMeasureIcon(point.index)}
+                    interactive={false}
+                />
+            ))}
+        </>
+    );
+});
+
+function FullscreenControl({ isFullscreen, onToggle, sidebarOpen = false }) {
+    return (
+        <button
+            type="button"
+            className={`map__fullscreen-btn${sidebarOpen ? ' map__fullscreen-btn--sidebar-open' : ''}`}
+            onClick={onToggle}
+            aria-label={isFullscreen ? "Выход из полноэкранного режима" : "Перейти в полноэкранный режим"}
+        >
+            {isFullscreen ? (
+                <svg width="25" height="25">
+                    <use href={"/sprite.svg#arrow-in"} />
+                </svg>
+            ) : (
+                <svg width="25" height="25">
+                    <use href={"/sprite.svg#arrow-out"} />
+                </svg>
+            )}
+        </button>
+    )
+}
+
+// Стандартные топографические / военные масштабы для дропдауна выбора и снаппинга.
+// Убраны масштабы детальнее 1:10 000 (по требованию пользователя).
+const AVAILABLE_DENOMINATORS = [
+    25000, 50000, 100000, 200000, 500000, 1000000, 2500000, 3000000,
+    5000000, 10000000, 50000000,
+];
+
+function metersPerPxAtZoom(lat, zoom) {
+    return 156543.03392 * Math.cos((lat * Math.PI) / 180) / Math.pow(2, zoom);
+}
+
+// Линейка масштаба (топографический стиль) — двухцветная графическая шкала (только fullscreen).
+function MapScaleBar({ isFullscreen }) {
+    const map = useMap();
+    const [scale, setScale] = useState(null);
+    const scaleTimeoutRef = useRef(null);
+
+    const updateScale = useCallback(() => {
+        if (!map || !isFullscreen) {
+            setScale(null);
+            return;
+        }
+
+        const center = map.getCenter();
+        const zoom = map.getZoom();
+        const metersPerPxRuler = metersPerPxAtZoom(center.lat, zoom);
+
+        const targetPx = 170;
+        let groundMeters = targetPx * metersPerPxRuler;
+
+        const exp = Math.floor(Math.log10(Math.max(groundMeters, 1)));
+        const base = Math.pow(10, exp);
+        const coeff = groundMeters / base;
+
+        let niceCoeff;
+        if (coeff < 1.4) niceCoeff = 1;
+        else if (coeff < 2.8) niceCoeff = 2;
+        else if (coeff < 7) niceCoeff = 5;
+        else niceCoeff = 10;
+
+        let niceMeters = niceCoeff * base;
+        let barWidth = Math.round(niceMeters / metersPerPxRuler);
+        barWidth = Math.max(80, Math.min(260, barWidth));
+
+        let distLabel;
+        let unit;
+        if (niceMeters >= 1000) {
+            distLabel = niceMeters >= 10000 ? Math.round(niceMeters / 1000) : (niceMeters / 1000).toFixed(1);
+            unit = "км";
+        } else {
+            distLabel = Math.round(niceMeters);
+            unit = "м";
+        }
+
+        const numSegments = 4;
+        const segmentWidth = Math.floor(barWidth / numSegments);
+
+        setScale({
+            barWidth,
+            distLabel,
+            unit,
+            numSegments,
+            segmentWidth
+        });
+    }, [map, isFullscreen]);
+
+    useEffect(() => {
+        if (!map) return undefined;
+
+        const scheduleUpdate = () => {
+            if (scaleTimeoutRef.current) clearTimeout(scaleTimeoutRef.current);
+            scaleTimeoutRef.current = setTimeout(updateScale, 60);
+        };
+
+        map.on("zoomend", scheduleUpdate);
+        map.on("moveend", scheduleUpdate);
+        map.on("resize", scheduleUpdate);
+        updateScale();
+
+        return () => {
+            map.off("zoomend", scheduleUpdate);
+            map.off("moveend", scheduleUpdate);
+            map.off("resize", scheduleUpdate);
+            if (scaleTimeoutRef.current) clearTimeout(scaleTimeoutRef.current);
+        };
+    }, [map, updateScale]);
+
+    if (!isFullscreen || !scale) {
+        return null;
+    }
+
+    const segments = [];
+    for (let i = 0; i < scale.numSegments; i += 1) {
+        const isDark = i % 2 === 0;
+        segments.push(
+            <div
+                key={i}
+                style={{
+                    width: `${scale.segmentWidth}px`,
+                    height: "7px",
+                    backgroundColor: isDark ? "#1f2a38" : "#f4f6f7",
+                    // Рамка только на контейнере .map-scale-ruler; здесь только разделительные линии
+                    borderRight: i < scale.numSegments - 1 ? "1px solid #3a4654" : "none",
+                    boxSizing: "border-box"
+                }}
+            />
+        );
+    }
+
+    return (
+        <div className="map-scale-bar map-scale-bar--ruler-only">
+            <div
+                className="map-scale-ruler"
+                style={{ width: `${scale.barWidth}px` }}
+            >
+                {segments}
+            </div>
+            <div className="map-scale-labels">
+                <span>0</span>
+                <span>{scale.distLabel}&nbsp;{scale.unit}</span>
+            </div>
+        </div>
+    );
+}
+
+const FlagMapMarker = React.memo(function FlagMapMarker({
+    obj,
+    icon,
+    measureMode,
+    eventDrawingActive,
+    altAddTargetActive,
+    onEventMapClick,
+    onAltClickAddTarget,
+    onMarkerClick,
+    onMarkerHover,
+    demoEffect = null,
+}) {
+    const markerRef = useRef(null);
+
+    useEffect(() => {
+        applyObjectDemoEffect(markerRef.current, demoEffect);
+    }, [demoEffect]);
+
+    const eventHandlers = useMemo(() => ({
+        add: (e) => {
+            applyObjectDemoEffect(e.target, demoEffect);
+        },
+        click: (e) => {
+            if (eventDrawingActive) {
+                onEventMapClick?.(e.latlng, e.target._map);
+                return;
+            }
+            if (altAddTargetActive && e.originalEvent?.altKey) {
+                onAltClickAddTarget?.({
+                    lat: e.latlng.lat,
+                    lng: e.latlng.lng,
+                });
+                return;
+            }
+            if (measureMode && e.originalEvent?.ctrlKey) return;
+            if (onMarkerClick && obj.id) onMarkerClick(obj.id);
+        },
+        mouseover: () => {
+            if (obj.id) onMarkerHover(obj.id);
+        },
+        mouseout: () => onMarkerHover(null),
+    }), [obj.id, measureMode, eventDrawingActive, altAddTargetActive, onEventMapClick, onAltClickAddTarget, onMarkerClick, onMarkerHover, demoEffect]);
+
+    if (!icon) return null;
+
+    return (
+        <Marker
+            ref={markerRef}
+            position={[obj.lat, obj.lng]}
+            icon={icon}
+            draggable={false}
+            eventHandlers={eventHandlers}
+        />
+    );
+});
+
+function getFlagMarkerKey(o, demoEffect) {
+    const markerId = o.marker?.id ?? 'no-marker';
+    return `${o.id}-${markerId}${objectDemoMarkerKeySuffix(demoEffect)}`;
+}
+
+const FlagMarkersLayer = React.memo(function FlagMarkersLayer({
+    markers,
+    iconsById,
+    measureMode,
+    eventDrawingActive,
+    altAddTargetActive,
+    onEventMapClick,
+    onAltClickAddTarget,
+    onMarkerClick,
+    onMarkerHover,
+    demoAnimation = null,
+}) {
+    const visible = useMapViewportMarkers(markers);
+    return visible.map((obj) => {
+        const demoEffect = resolveObjectDemoEffect(obj, demoAnimation);
+        return (
+            <FlagMapMarker
+                key={getFlagMarkerKey(obj, demoEffect)}
+                obj={obj}
+                icon={iconsById[obj.id]}
+                measureMode={measureMode}
+                eventDrawingActive={eventDrawingActive}
+                altAddTargetActive={altAddTargetActive}
+                onEventMapClick={onEventMapClick}
+                onAltClickAddTarget={onAltClickAddTarget}
+                onMarkerClick={onMarkerClick}
+                onMarkerHover={onMarkerHover}
+                demoEffect={demoEffect}
+            />
+        );
+    });
+});
+
+const NonFlagMapMarker = React.memo(function NonFlagMapMarker({
+    obj,
+    icon,
+    measureMode,
+    eventDrawingActive,
+    altAddTargetActive,
+    onEventMapClick,
+    onAltClickAddTarget,
+    pinnedGroupId,
+    onMarkerClick,
+    onMarkerHover,
+    onGroupHover,
+    onPinGroup,
+    demoEffect = null,
+}) {
+    const markerRef = useRef(null);
+
+    useEffect(() => {
+        applyObjectDemoEffect(markerRef.current, demoEffect);
+    }, [demoEffect]);
+
+    const eventHandlers = useMemo(() => ({
+        add: (e) => {
+            applyObjectDemoEffect(e.target, demoEffect);
+        },
+        mouseover: () => {
+            if (obj.isGroupIcon) {
+                onGroupHover(obj.groupId);
+            } else if (obj.id) {
+                onMarkerHover(obj.id);
+            }
+        },
+        mouseout: () => {
+            if (obj.isGroupIcon) {
+                if (pinnedGroupId !== obj.groupId) onGroupHover(null);
+            } else {
+                onMarkerHover(null);
+            }
+        },
+        click: (e) => {
+            if (eventDrawingActive) {
+                onEventMapClick?.(e.latlng, e.target._map);
+                return;
+            }
+            if (altAddTargetActive && e.originalEvent?.altKey) {
+                onAltClickAddTarget?.({
+                    lat: e.latlng.lat,
+                    lng: e.latlng.lng,
+                });
+                return;
+            }
+            if (obj.isGroupIcon) {
+                e.originalEvent.stopPropagation();
+                if (pinnedGroupId === obj.groupId) {
+                    onPinGroup(null);
+                    onGroupHover(null);
+                } else {
+                    onPinGroup(obj.groupId);
+                }
+            } else {
+                if (measureMode && e.originalEvent?.ctrlKey) return;
+                if (onMarkerClick && obj.id) onMarkerClick(obj.id);
+            }
+        },
+    }), [
+        obj.id,
+        obj.isGroupIcon,
+        obj.groupId,
+        measureMode,
+        eventDrawingActive,
+        altAddTargetActive,
+        onEventMapClick,
+        onAltClickAddTarget,
+        pinnedGroupId,
+        onMarkerClick,
+        onMarkerHover,
+        onGroupHover,
+        onPinGroup,
+        demoEffect,
+    ]);
+
+    if (!icon) return null;
+
+    return (
+        <Marker
+            ref={markerRef}
+            position={[obj.lat, obj.lng]}
+            icon={icon}
+            draggable={false}
+            eventHandlers={eventHandlers}
+        />
+    );
+});
+
+const NonFlagMarkersLayer = React.memo(function NonFlagMarkersLayer({
+    groupedObjects,
+    iconsById,
+    selectedIds,
+    currentZoom,
+    forceShowAllMarkers = false,
+    pinnedGroupId,
+    measureMode,
+    eventDrawingActive,
+    altAddTargetActive,
+    onEventMapClick,
+    onAltClickAddTarget,
+    onMarkerClick,
+    onMarkerHover,
+    onGroupHover,
+    onPinGroup,
+    demoAnimation = null,
+}) {
+    const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+    const candidates = useMemo(() => {
+        if (!forceShowAllMarkers && currentZoom < 6) return [];
+        return (groupedObjects || []).filter((obj) => !obj.isHidden && selectedSet.has(obj.id));
+    }, [groupedObjects, selectedSet, currentZoom, forceShowAllMarkers]);
+
+    const visible = useMapViewportMarkers(candidates);
+
+    return visible.map((obj) => {
+        const demoEffect = resolveObjectDemoEffect(obj, demoAnimation);
+        const markerId = obj.marker?.id ?? 'no-marker';
+        const key = obj.isGroupIcon
+            ? `non-flag-group-${obj.groupId}${objectDemoMarkerKeySuffix(demoEffect)}`
+            : `non-flag-${obj.id}-${markerId}${objectDemoMarkerKeySuffix(demoEffect)}`;
+        return (
+            <NonFlagMapMarker
+                key={key}
+                obj={obj}
+                icon={iconsById[obj.isGroupIcon ? obj.groupId : obj.id]}
+                measureMode={measureMode}
+                eventDrawingActive={eventDrawingActive}
+                altAddTargetActive={altAddTargetActive}
+                onEventMapClick={onEventMapClick}
+                onAltClickAddTarget={onAltClickAddTarget}
+                pinnedGroupId={pinnedGroupId}
+                onMarkerClick={onMarkerClick}
+                onMarkerHover={onMarkerHover}
+                onGroupHover={onGroupHover}
+                onPinGroup={onPinGroup}
+                demoEffect={demoEffect}
+            />
+        );
+    });
+});
+
+// Компонент для отображения элементов группы в круге при наведении.
+// Оптимизация: React.memo + вычисления зависят только от displayGroupId + groupedObjects.
+const GroupCircleDisplay = React.memo(function GroupCircleDisplay({ groupedObjects, hoveredGroupId, pinnedGroupId, onPinGroup, iconsById, svgCache, onMarkerClick, measureMode, eventDrawingActive, altAddTargetActive, onEventMapClick, onAltClickAddTarget, onMarkerHover }) {
+    const [mapRevision, setMapRevision] = React.useState(0);
+    const mapInstance = useMapEvents({
+        zoomend: () => setMapRevision((v) => v + 1),
+        moveend: () => setMapRevision((v) => v + 1),
+    });
+    const [circleMarkers, setCircleMarkers] = React.useState([]);
+    const [circleCenter, setCircleCenter] = React.useState(null);
+    const [circleIcons, setCircleIcons] = React.useState({});
+
+    // Показываем круг если группа наведена ИЛИ закреплена
+    const displayGroupId = pinnedGroupId || hoveredGroupId;
+
+    React.useEffect(() => {
+        if (!displayGroupId || !groupedObjects.length || !mapInstance) {
+            setCircleMarkers([]);
+            return;
+        }
+
+        // Находим группу. Для центра окружности ВСЕГДА используем запись с isGroupIcon —
+        // у неё координаты первого объекта кластера (см. processNonFlagClustering).
+        // Это гарантирует, что иконка группировки находится на позиции первого объекта (требование 1),
+        // и центр круга будет совпадать с визуальным положением маркера группировки (требование 2).
+        const groupIconEntry = groupedObjects.find(g => g.groupId === displayGroupId && g.isGroupIcon);
+        const group = groupIconEntry || groupedObjects.find(g => g.groupId === displayGroupId);
+
+        if (!group || !group.isGrouped || !group.groupObjects) {
+            setCircleMarkers([]);
+            return;
+        }
+
+        // Центр окружности = позиция групповой иконки (lat/lng первого объекта группы).
+        const centerLat = group.lat;
+        const centerLng = group.lng;
+
+        // Получаем относительные позиции через общую утилиту (меньше дублирования кода, единый источник радиуса).
+        // Радиус компактный (32px по умолчанию) — элементы располагаются плотно ВОКРУГ маркера группировки.
+        // Центр окружности = точная позиция групповой иконки (требование 2).
+        const relativePositions = getGroupCirclePositions(group.groupObjects, 40);
+
+        // Небольшой вертикальный bias, чтобы круг лучше визуально центрировался на группе.
+        // Групповая иконка (35px) визуально "сидит" иначе, чем 50px non-flag иконки.
+        // Положительное значение смещает членов круга вниз (по layer Y), чтобы группа не казалась ниже.
+        const circleVerticalBias = 8;
+
+        const positionsWithCircle = relativePositions.map((rel) => {
+            // При необходимости слегка масштабируем радиус под размер иконки члена группы,
+            // но сохраняем общий компактный характер (не как раньше 60+).
+            const markerScale = parseFloat(rel.marker?.scale) || 1;
+            const scaleFactor = 1 + Math.min((markerScale - 1) * 0.1, 0.2);
+            const x = rel.circleX * scaleFactor;
+            const y = rel.circleY * scaleFactor + circleVerticalBias;
+
+            // Преобразуем пиксельное смещение относительно экранной позиции центра
+            // (latLng группы) в новые lat/lng для временных маркеров круга.
+            const point = mapInstance.latLngToLayerPoint([centerLat, centerLng]);
+            const newPoint = L.point(point.x + x, point.y + y);
+            const newLatLng = mapInstance.layerPointToLatLng(newPoint);
+
+            return {
+                ...rel,
+                lat: newLatLng.lat,
+                lng: newLatLng.lng,
+                originalLat: centerLat,
+                originalLng: centerLng
+            };
+        });
+
+        setCircleMarkers(positionsWithCircle);
+        setCircleCenter({ lat: centerLat, lng: centerLng });
+    }, [displayGroupId, groupedObjects, mapInstance, mapRevision]);
+
+    React.useEffect(() => {
+        if (!displayGroupId || !groupedObjects.length) {
+            setCircleIcons({});
+            return;
+        }
+        const groupIconEntry = groupedObjects.find(g => g.groupId === displayGroupId && g.isGroupIcon);
+        const group = groupIconEntry || groupedObjects.find(g => g.groupId === displayGroupId);
+        if (!group?.groupObjects || !svgCache?.size) {
+            setCircleIcons({});
+            return;
+        }
+        setCircleIcons(ensureNonFlagIconsForObjects(group.groupObjects, svgCache, iconsById ?? {}));
+    }, [displayGroupId, groupedObjects, svgCache, iconsById]);
+
+    if (!circleCenter || circleMarkers.length === 0 || !displayGroupId) return null;
+
+    const handleCloseCircle = () => {
+        onPinGroup(null);
+    };
+
+    return (
+        <>
+            {/* Маркеры элементов в круге */}
+            {circleMarkers.map((marker, idx) => {
+                const markerIcon = circleIcons[marker.id] || (iconsById ? iconsById[marker.id] : null);
+                const circleFill = getCountryMarkerPalette(marker.country).color_first;
+
+                return (
+                    <Marker
+                        key={`circle-marker-${displayGroupId}-${idx}`}
+                        position={[marker.lat, marker.lng]}
+                        icon={markerIcon || getCircleFallbackIcon(circleFill)}
+                        draggable={false}
+                        eventHandlers={{
+                            mouseover: () => {
+                                if (marker.id && onMarkerHover) {
+                                    onMarkerHover(marker.id);
+                                }
+                            },
+                            mouseout: () => {
+                                if (onMarkerHover) onMarkerHover(null);
+                            },
+                            click: (e) => {
+                                e.originalEvent.stopPropagation();
+
+                                if (eventDrawingActive) {
+                                    onEventMapClick?.(e.latlng, e.target._map);
+                                    return;
+                                }
+
+                                if (altAddTargetActive && e.originalEvent?.altKey) {
+                                    onAltClickAddTarget?.({
+                                        lat: e.latlng.lat,
+                                        lng: e.latlng.lng,
+                                    });
+                                    return;
+                                }
+
+                                handleCloseCircle();
+                                if (measureMode && e.originalEvent?.ctrlKey) {
+                                    return;
+                                }
+                                if (onMarkerClick && marker.id) {
+                                    onMarkerClick(marker.id);
+                                }
+                            }
+                        }}
+                    />
+                );
+            })}
+        </>
+    );
+});
+
+ // Компонент для отслеживания изменений зума
+function EmbedMapFixer({ enabled }) {
+    const map = useMap();
+    useEffect(() => {
+        if (!enabled || !map) return undefined;
+        const run = () => {
+            try {
+                map.invalidateSize();
+            } catch {
+                // контейнер ещё без размеров
+            }
+        };
+        run();
+        const t0 = setTimeout(run, 50);
+        const t1 = setTimeout(run, 300);
+        return () => {
+            clearTimeout(t0);
+            clearTimeout(t1);
+        };
+    }, [enabled, map]);
+    return null;
+}
+
+function ZoomTracker({ onZoomChange }) {
+    const map = useMapEvents({
+        zoomend: () => {
+            onZoomChange(map.getZoom());
+        }
+    });
+    return null;
+}
+
+/**
+ * Единый стабильный мост для событий карты (click и т.п.).
+ * Компонент объявлен на уровне модуля (не внутри рендера MapComponent), поэтому
+ * его тип стабилен и Leaflet-обработчики не переподписываются на каждый ре-рендер.
+ * Актуальная логика читается из ref (apiRef.current) в момент события.
+ */
+function MapEventBridge({ apiRef }) {
+    const map = useMapEvents({
+        click: (e) => apiRef.current?.onClick?.(e, map),
+        dblclick: (e) => {
+            const handled = apiRef.current?.onDblClick?.(e, map);
+            if (handled) {
+                L.DomEvent.stopPropagation(e);
+            }
+        },
+        mousemove: (e) => apiRef.current?.onMouseMove?.(e, map),
+        mouseout: (e) => apiRef.current?.onMouseOut?.(e, map),
+    });
+    return null;
+}
+
+/** Связывает Leaflet-карту с rAF-анимациями демонстрации и отдаёт API слоёв наружу. */
+function DemoMapBridge({ onOverlayLayersRef, setOnlyOverlayLayers, overlayEnabledById, bindAnimationMap = true }) {
+    const map = useMap();
+
+    useEffect(() => {
+        if (!bindAnimationMap) return undefined;
+        setDemoAnimationMap(map);
+        return () => setDemoAnimationMap(null);
+    }, [map, bindAnimationMap]);
+
+    useEffect(() => {
+        if (!onOverlayLayersRef) return undefined;
+        onOverlayLayersRef.current = {
+            setOverlayLayers: setOnlyOverlayLayers,
+            getEnabledIds: () => Object.entries(overlayEnabledById || {})
+                .filter(([, enabled]) => enabled)
+                .map(([id]) => id),
+        };
+        return () => {
+            onOverlayLayersRef.current = null;
+        };
+    }, [onOverlayLayersRef, setOnlyOverlayLayers, overlayEnabledById]);
+
+    return null;
+}
+
+/**
+ * Во время показа докладчик может свободно работать с картой: демонстрация при
+ * этом не прерывается, лишь отсчёт текущего такта придерживается, пока идёт
+ * перетаскивание или зум — иначе автопереход выдернул бы камеру из-под руки.
+ */
+function DemoInteractionBridge({ active, onHold, onRelease, suspendHold = false }) {
+    const map = useMap();
+    const suspendHoldRef = useRef(suspendHold);
+    suspendHoldRef.current = suspendHold;
+
+    useEffect(() => {
+        if (!active || !map) return undefined;
+        const hold = () => {
+            if (suspendHoldRef.current) return;
+            onHold?.();
+        };
+        const release = () => onRelease?.();
+
+        map.on('dragstart zoomstart mousedown', hold);
+        map.on('dragend zoomend mouseup', release);
+        return () => {
+            map.off('dragstart zoomstart mousedown', hold);
+            map.off('dragend zoomend mouseup', release);
+            onRelease?.();
+        };
+    }, [active, map, onHold, onRelease]);
+
+    return null;
+}
+
+function MapComponent({
+    // ...existing code...
+    objects,
+    zoneObjects = [],
+    selectedObj,
+    events = [],
+    selectedEventIds = [],
+    mapRef,
+    measureMode = false,
+    measurements = [],
+    onAddMeasurePoint,
+    onCheckboxChange = () => {},
+    onSelectionChange,
+    showActionRadius: externalShowActionRadius = false,
+    actionTypes = [],
+    actionRadiusMode: _actionRadiusMode = "animation",
+    onActionRadiusModeChange: _onActionRadiusModeChange,
+    intersections = [],
+    selectedIntersections = [],
+    onIntersectionToggle,
+    onSelectAllIntersections,
+    isFullscreen,
+    setIsFullscreen,
+    // Подняты в Formular (sidebar панель управления)
+    actionZoneFilters = {},
+    showZoneIntersections = false,
+    // Дополнительные для полной поддержки панели "Настройка отображения" в fs map_sidebar (Features)
+    // (раньше не передавались в fs-ветку — слабое место, из-за которого панель не появлялась).
+    actionZoneAvailableByCountry = {},
+    setShowZoneIntersections,
+    toggleZoneLeaf,
+    toggleAllForActionType,
+    toggleAllForCountry,
+    resetZoneFilters,
+    globalActionTypeCatalog = [],
+    equipmentZoneDiagnostics = [],
+    quickSelectLeaves = new Set(),
+    quickSelectCountries = new Set(),
+    quickSelectCombo = new Set(),
+    toggleQuickSelectLeaf,
+    toggleAllQuickSelectLeavesForType,
+    setAllQuickSelectLeaves,
+    toggleQuickSelectCountry,
+    setAllQuickSelectCountries,
+    considerTerrain = true,
+    onConsiderTerrainChange,
+    losGeometryByZoneKey = {},
+    losComputingCount = 0,
+    losZonesCount = 0,
+    visibleZones = null,
+    mapUiResetToken = 0,
+    onResetAllMapState,
+    // ...existing code...
+    onMeasureModeChange,
+    onMeasurePointsChange,
+    onShowActionRadiusChange: _onShowActionRadiusChange,
+    onTableTabChange,
+    onMarkerClick,
+    onMarkerHover,
+    onAltClickAddTarget,
+    onEditClick,
+    onTargetOpenDetails,
+    canEditCountry = false,
+    onDeleteClick,
+    onEventSave,
+    filterCountry = [],
+    onFilterCountryChange,
+    filterType = [],
+    onFilterTypeChange,
+    filterTitle = "",
+    onFilterTitleChange,
+    targetTypes = [],
+    countriesList = [],
+    eventTypesList = [],
+    eventsFilters = { title: "", dateFrom: "", dateTo: "", timeFrom: "", timeTo: "", countries: [], eventTypes: [] },
+    onEventsFiltersChange = () => {},
+    onEventCheckboxChange,
+    onEventDelete,
+    onEventFlyTo,
+    onEventEdit = () => {},
+    editEventDrawMode = null,
+    editEventDrawPoints = [],
+    onEditEventDrawPointsChange = () => {},
+    isEditEventMode = false,
+    polygonDrawSession = null,
+    onPolygonDrawPointsChange = () => {},
+    onPolygonDrawComplete = () => {},
+    onPolygonDrawCancel = () => {},
+    tableTab,
+    situations = [],
+    selectedSituationIds = [],
+    activeSituationId = null,
+    timelineRevisionId = null,
+    onSituationDemoRevisionChange,
+    situationRevisions = [],
+    onSituationClick = () => {},
+    isSituationDrawActive = false,
+    situationDrawPolygons = [],
+    onSituationDrawPolygonsChange = () => {},
+    situationDrawPoints = [],
+    onSituationDrawPointsChange = () => {},
+    situationDrawTerritoryIndex = 0,
+    onSituationDrawConfirm = () => {},
+    onSituationDrawCancel = () => {},
+    detailSituation = null,
+    onSituationDetailClose = () => {},
+    onSituationEdit,
+    onSituationNewState,
+    onSituationRevisionSelect = () => {},
+    situationsFilters = { title: '', dateFrom: '', dateTo: '', countries: [] },
+    onSituationsFiltersChange = () => {},
+    onSituationCheckboxChange,
+    onSituationDelete,
+    onSituationFlyTo,
+    onSituationCreate,
+    highlightedSituationId = null,
+    onSituationRowClick,
+    activeSituationTimeline = [],
+    onTimelineRevisionSelect = () => {},
+    onTimelineRevisionEdit,
+    onTimelineRevisionDelete,
+    canEditSituations = false,
+    canDeleteSituations = false,
+    isSituationModalOpen = false,
+    editingSituationId = null,
+    canReadSituations = true,
+    mapZoomRules = DEFAULT_MAP_DISPLAY_ZOOM_RULES,
+    vulnerabilityMapPoints = [],
+    vulnerabilityPickActive = false,
+    onVulnerabilityMapPick,
+    eventsLoading = false,
+    eventsError = null,
+    situationsLoading = false,
+    situationsError = null,
+    canEditTargets = false,
+    onOpenAddTarget,
+    canOpenReference = false,
+    onOpenReference,
+    canOpenReports = false,
+    onOpenReports,
+    eventDrawRequest = 0,
+    demoAnimation = null,
+    demoPlayback = null,
+    demoTexts = null,
+    demoMenu = null,
+    favoritesMenu = null,
+    demoContentCardId = null,
+    demoTextEditDraft = null,
+    onDemoTextEditChange,
+    onDemoTextEditFinish,
+    onDemoToggle,
+    onDemoNext,
+    onDemoPrev,
+    onDemoStop,
+    onDemoGoToStage,
+    onDemoBlackout,
+    onDemoInteractionHold,
+    onDemoInteractionRelease,
+    onDemoOverlayLayersRef,
+    countryIso,
+    onCountryIsoChange,
+    onCountryModalClose,
+    onDemoCountryBoundsRef,
+    embed = false,
+    embedPlaying = true,
+    embedOverlayLayerIds = null,
+    /** Без MapLibre — растровые тайлы Leaflet (плитки мультиэкрана). */
+    embedLite = false,
+    suspendMap = false,
+}) {
+    const zoneObjectsSource = zoneObjects.length > 0 ? zoneObjects : objects;
+    const mapConsiderTerrain = Boolean(considerTerrain) && !demoPlayback?.isActive;
+
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [dockTab, setDockTab] = useState(null);
+    const [isDockVisible, setIsDockVisible] = useState(true);
+    const [demoShowDock, setDemoShowDock] = useState(false);
+    const isDemoPlayback = Boolean(demoPlayback?.isActive);
+    const demoSuspendMap = Boolean(demoPlayback?.suspendMap);
+    const forceShowAllMarkers = Boolean(demoPlayback?.forceShowAllMarkers);
+    const freezeMapLayout = Boolean(demoPlayback?.freezeMapLayout);
+    const freezeMapLayoutRef = useRef(freezeMapLayout);
+    freezeMapLayoutRef.current = freezeMapLayout;
+    const panelTouchStartX = useRef(0);
+    const maplibreMapRef = useRef(null);
+    const demoSuspendMapRef = useRef(demoSuspendMap);
+    demoSuspendMapRef.current = demoSuspendMap;
+    const [maplibreReady, setMaplibreReady] = useState(false);
+    const [vectorMapError, setVectorMapError] = useState(null);
+    const { enabledById: overlayEnabledById, toggleLayer: toggleOverlayLayer, setAllLayers: setAllOverlayLayers, setOnlyLayers: setOnlyOverlayLayers, activeLayers: activeOverlayLayers } = useMapOverlayLayers(maplibreMapRef, maplibreReady, { persist: !embed });
+    const [isMeasureMode, setIsMeasureMode] = useState(false);
+    const [isMeasureMenuOpen, setIsMeasureMenuOpen] = useState(false);
+    const [measurePoints, setMeasurePoints] = useState([]);
+    const [currentZoom, setCurrentZoom] = useState(4);
+    const [hoveredZoneList, setHoveredZoneList] = useState([]);
+    const [pinnedZonePanel, setPinnedZonePanel] = useState(null);
+    const [selectedZoneEntryId, setSelectedZoneEntryId] = useState(null);
+    const [activeZonePopup, setActiveZonePopup] = useState(null);
+    const [activeZonePopupVersion, setActiveZonePopupVersion] = useState(0);
+    const [geoData, setGeoData] = useState(null);
+    const [markerData, setMarkerData] = useState({ iconsById: {}, clusteredObjects: [], bubbles: [] });
+    const [flagBubbles, setFlagBubbles] = useState([]);
+    const [nonFlagBubbles, setNonFlagBubbles] = useState([]);
+    const [clusterMode, setClusterModeState] = useState(() => (embed ? 'legacy' : loadMapClusterMode()));
+    const effectiveClusterMode = forceShowAllMarkers ? 'none' : clusterMode;
+    const [nonFlagData, setNonFlagData] = useState({ iconsById: {}, groupedObjects: [], svgCache: new Map() });
+    const [hoveredGroupId, setHoveredGroupId] = useState(null);
+    const [pinnedGroupId, setPinnedGroupId] = useState(null);
+    const [internalCountryIso, setInternalCountryIso] = useState(null);
+    const countryControlled = countryIso !== undefined;
+    const selectedCountryIso = countryControlled ? countryIso : internalCountryIso;
+    const setSelectedCountryIso = useCallback((iso) => {
+        if (onCountryIsoChange) onCountryIsoChange(iso);
+        if (!countryControlled) setInternalCountryIso(iso);
+    }, [countryControlled, onCountryIsoChange]);
+    const [isEventModalOpen, setIsEventModalOpen] = useState(false);
+    const [hoveredTargetId, setHoveredTargetId] = useState(null);
+
+    useEffect(() => {
+        if (!embed) return;
+        setOnlyOverlayLayers(embedOverlayLayerIds || []);
+    }, [embed, embedOverlayLayerIds, setOnlyOverlayLayers]);
+
+    useEffect(() => {
+        if (!demoSuspendMap) return;
+        maplibreMapRef.current = null;
+        setMaplibreReady(false);
+        const el = cursorCoordsRef.current;
+        if (el) el.style.display = 'none';
+    }, [demoSuspendMap]);
+
+    useEffect(() => {
+        if (!maplibreReady) return undefined;
+        const map = maplibreMapRef.current;
+        if (!map) return undefined;
+        const shouldPause = suspendMap || (embed && embedPlaying === false);
+        if (shouldPause) map.pause?.();
+        else map.resume?.();
+        return undefined;
+    }, [embed, embedPlaying, maplibreReady, suspendMap]);
+
+    const handleMaplibreReady = useCallback((map) => {
+        if (demoSuspendMapRef.current) return;
+        maplibreMapRef.current = map;
+        setVectorMapError(null);
+        setMaplibreReady(true);
+    }, []);
+
+    const handleMaplibreError = useCallback((message) => {
+        setVectorMapError(message);
+    }, []);
+
+    // Stable Set for O(1) lookups in heavy filters / renders (avoids .includes on every item during flyTo re-renders etc)
+    const [fullscreenTab, setFullscreenTab] = useState("objects");
+    const handleFullscreenTabChange = useCallback((tab) => {
+        setFullscreenTab(tab);
+        onTableTabChange?.(tab);
+    }, [onTableTabChange]);
+
+    const closeFullscreenPanel = useCallback(() => {
+        setIsSidebarOpen(false);
+        setDockTab(null);
+    }, []);
+
+    const hideDock = useCallback(() => {
+        closeFullscreenPanel();
+        setIsDockVisible(false);
+    }, [closeFullscreenPanel]);
+
+    const showDock = useCallback(() => {
+        setIsDockVisible(true);
+    }, []);
+
+    const hideDemoDock = useCallback(() => {
+        closeFullscreenPanel();
+        setDemoShowDock(false);
+    }, [closeFullscreenPanel]);
+
+    const showDemoDock = useCallback(() => {
+        setDemoShowDock(true);
+    }, []);
+
+    const openDock = useCallback((tab) => {
+        if (!isDockVisible) setIsDockVisible(true);
+        if (dockTab === tab && isSidebarOpen) {
+            closeFullscreenPanel();
+            return;
+        }
+        setDockTab(tab);
+        if (tab !== 'layers') {
+            handleFullscreenTabChange(tab);
+        }
+        setIsSidebarOpen(true);
+    }, [dockTab, isSidebarOpen, isDockVisible, closeFullscreenPanel, handleFullscreenTabChange]);
+
+    const selectPanelTab = useCallback((tab) => {
+        setDockTab(tab);
+        if (tab !== 'layers') {
+            handleFullscreenTabChange(tab);
+        }
+        setIsSidebarOpen(true);
+    }, [handleFullscreenTabChange]);
+
+    const handlePanelTouchStart = useCallback((e) => {
+        panelTouchStartX.current = e.touches[0]?.clientX ?? 0;
+    }, []);
+
+    const handlePanelTouchEnd = useCallback((e) => {
+        const endX = e.changedTouches[0]?.clientX ?? 0;
+        if (endX - panelTouchStartX.current > 70) {
+            closeFullscreenPanel();
+        }
+    }, [closeFullscreenPanel]);
+
+    const selectedSet = useMemo(() => new Set(selectedObj), [selectedObj]);
+    const selectedEventIdSet = useMemo(() => new Set(selectedEventIds), [selectedEventIds]);
+    const visibleMapEvents = useMemo(
+        () => events.filter((item) => selectedEventIdSet.has(item.id)),
+        [events, selectedEventIdSet],
+    );
+    const [eventMarkerSvgs, setEventMarkerSvgs] = useState(new Map());
+    const eventMarkerFetchRef = useRef(new Set());
+    const isEventPointDraggingRef = useRef(false);
+    const isEventPointPointerDownRef = useRef(false);
+    const cursorCoordsRef = useRef(null);
+    const skipZoneHoverUpdatesRef = useRef(false);
+    const suppressNextMapClickRef = useRef(false);
+
+    useEffect(() => {
+        if (!mapUiResetToken) return;
+        setPinnedZonePanel(null);
+        setPinnedGroupId(null);
+        setHoveredGroupId(null);
+        setHoveredZoneList([]);
+        setSelectedZoneEntryId(null);
+        setActiveZonePopup(null);
+        setActiveZonePopupVersion((v) => v + 1);
+        if (isFullscreen) {
+            setMeasurePoints([]);
+            setIsMeasureMode(false);
+        }
+    }, [mapUiResetToken, isFullscreen]);
+
+    const mapEventApiRef = useRef({});
+    const countryClickApiRef = useRef({});
+    const altAddTargetApiRef = useRef({});
+    const vulnerabilityPickRef = useRef(false);
+    vulnerabilityPickRef.current = vulnerabilityPickActive;
+    const zoneHoverControllerRef = useRef(null);
+    if (!zoneHoverControllerRef.current) {
+        zoneHoverControllerRef.current = createZoneHoverController();
+    }
+    const lastMarkerHoverRef = useRef(null);
+    const prevIsFullscreenRef = useRef(false);
+    const center = [51.1833, 71.4167];
+    const containerRef = useRef(null);
+    const sidebarRef = useRef(null);
+    const measureMenuRef = useRef(null);
+
+    useEffect(() => {
+        skipZoneHoverUpdatesRef.current = Boolean(pinnedZonePanel);
+    }, [pinnedZonePanel]);
+
+    // Ограничение движения карты по оси Y (чтобы нельзя было уехать за полюса)
+    const mapMaxBounds = [[-85.0511287798, -180], [85.0511287798, 180]];
+
+    const isEventEditModeActive = isEditEventMode && !!editEventDrawMode;
+    const eventsTabActive = tableTab === 'events';
+    const eventsDrawingEnabled = eventsTabActive || isEventEditModeActive;
+
+    const eventDrawing = useEventDrawing({
+        enabled: eventsDrawingEnabled,
+        isEditMode: isEventEditModeActive,
+        drawMode: editEventDrawMode,
+        drawPoints: editEventDrawPoints,
+        onDrawPointsChange: onEditEventDrawPointsChange,
+    });
+
+    const isPolygonDrawActive = Boolean(polygonDrawSession);
+    const isSituationPolygonEditEnabled = isSituationDrawActive || isSituationModalOpen;
+    const isSituationDrawingActive = isSituationPolygonEditEnabled
+        && (tableTab === 'situations' || isSituationModalOpen);
+    const polygonSessionPoints = polygonDrawSession?.points ?? EMPTY_DRAW_POINTS;
+    const situationSessionPoints = situationDrawPoints ?? EMPTY_DRAW_POINTS;
+    const situationCompletedPolygons = situationDrawPolygons ?? EMPTY_DRAW_POINTS;
+    const polygonDrawing = useEventDrawing({
+        enabled: isPolygonDrawActive,
+        isEditMode: true,
+        drawMode: 'polygon',
+        drawPoints: polygonSessionPoints,
+        onDrawPointsChange: onPolygonDrawPointsChange,
+    });
+    const situationDrawing = useEventDrawing({
+        enabled: isSituationDrawingActive,
+        isEditMode: true,
+        drawMode: 'polygon',
+        drawPoints: situationSessionPoints,
+        onDrawPointsChange: onSituationDrawPointsChange,
+        // While creating a new contour (before modal opens), keep drawing open-ended
+        // like Events "Произвольная форма" until user finishes explicitly.
+        autoClosePolygon: isSituationModalOpen,
+    });
+
+    const situationExtraClosedPolygons = useMemo(() => {
+        if (!isSituationDrawingActive) return EMPTY_DRAW_POINTS;
+        if (isSituationModalOpen) {
+            if (!situationCompletedPolygons.length) return EMPTY_DRAW_POINTS;
+            const activeIdx = situationCompletedPolygons.length
+                ? Math.min(
+                    Math.max(0, situationDrawTerritoryIndex),
+                    situationCompletedPolygons.length - 1,
+                )
+                : 0;
+            return situationCompletedPolygons.filter((_, i) => i !== activeIdx);
+        }
+        return situationCompletedPolygons;
+    }, [
+        isSituationDrawingActive,
+        isSituationModalOpen,
+        situationCompletedPolygons,
+        situationDrawTerritoryIndex,
+    ]);
+
+    const situationTerritoryCount = useMemo(() => {
+        const completed = situationCompletedPolygons.length;
+        const active = situationDrawing.drawPoints?.length ?? 0;
+        const activeClosed = situationDrawing.polygonClosed && active >= 3;
+        return completed + (activeClosed ? 1 : 0);
+    }, [
+        situationCompletedPolygons.length,
+        situationDrawing.drawPoints,
+        situationDrawing.polygonClosed,
+    ]);
+
+    const situationDrawReady = useMemo(() => {
+        const completed = situationCompletedPolygons.length;
+        if (completed < 1) return false;
+        const active = situationDrawing.drawPoints || [];
+        if (!active.length) return true;
+        return situationDrawing.polygonClosed && active.length >= 3;
+    }, [
+        situationCompletedPolygons.length,
+        situationDrawing.drawPoints,
+        situationDrawing.polygonClosed,
+    ]);
+
+    const canAddSituationTerritory = useMemo(() => {
+        if (isSituationModalOpen) return false;
+        const active = situationDrawing.drawPoints || [];
+        return situationCompletedPolygons.length >= 1
+            && active.length === 0
+            && !situationDrawing.polygonClosed;
+    }, [
+        isSituationModalOpen,
+        situationCompletedPolygons.length,
+        situationDrawing.drawPoints,
+        situationDrawing.polygonClosed,
+    ]);
+
+    const [eventPolygonEditable, setEventPolygonEditable] = useState([]);
+    const [zonePolygonEditable, setZonePolygonEditable] = useState([]);
+    const [situationPolygonEditable, setSituationPolygonEditable] = useState([]);
+    const skipEventPolygonSyncRef = useRef(false);
+    const skipZonePolygonSyncRef = useRef(false);
+    const skipSituationPolygonSyncRef = useRef(false);
+
+    const eventDrawPointsKey = drawPointsKey(eventDrawing.drawPoints);
+    const zoneDrawPointsKey = drawPointsKey(polygonDrawing.drawPoints);
+    const situationDrawPointsKey = drawPointsKey(situationDrawing.drawPoints);
+
+    useEffect(() => {
+        if (eventDrawing.drawMode !== 'polygon') {
+            setEventPolygonEditable((prev) => (prev.length === 0 ? prev : []));
+            return;
+        }
+        if (skipEventPolygonSyncRef.current) {
+            skipEventPolygonSyncRef.current = false;
+            return;
+        }
+        const next = drawPointsToEditable(eventDrawing.drawPoints);
+        const nextKey = editablePointsKey(next);
+        setEventPolygonEditable((prev) => (
+            editablePointsKey(prev) === nextKey ? prev : next
+        ));
+    }, [eventDrawing.drawMode, eventDrawPointsKey, eventDrawing.drawPoints]);
+
+    useEffect(() => {
+        if (!isPolygonDrawActive) {
+            setZonePolygonEditable((prev) => (prev.length === 0 ? prev : []));
+            return;
+        }
+        if (skipZonePolygonSyncRef.current) {
+            skipZonePolygonSyncRef.current = false;
+            return;
+        }
+        const next = drawPointsToEditable(polygonDrawing.drawPoints);
+        const nextKey = editablePointsKey(next);
+        setZonePolygonEditable((prev) => (
+            editablePointsKey(prev) === nextKey ? prev : next
+        ));
+    }, [isPolygonDrawActive, zoneDrawPointsKey, polygonDrawing.drawPoints]);
+
+    useEffect(() => {
+        if (!isSituationDrawingActive) {
+            setSituationPolygonEditable((prev) => (prev.length === 0 ? prev : []));
+            return;
+        }
+        if (skipSituationPolygonSyncRef.current) {
+            skipSituationPolygonSyncRef.current = false;
+            return;
+        }
+        const next = drawPointsToEditable(situationDrawing.drawPoints);
+        const nextKey = editablePointsKey(next);
+        setSituationPolygonEditable((prev) => (
+            editablePointsKey(prev) === nextKey ? prev : next
+        ));
+    }, [isSituationDrawingActive, situationDrawPointsKey, situationDrawing.drawPoints]);
+
+    const replaceEventDrawPointsRef = useRef(eventDrawing.replaceDrawPoints);
+    replaceEventDrawPointsRef.current = eventDrawing.replaceDrawPoints;
+    const replaceZoneDrawPointsRef = useRef(polygonDrawing.replaceDrawPoints);
+    replaceZoneDrawPointsRef.current = polygonDrawing.replaceDrawPoints;
+    const replaceSituationDrawPointsRef = useRef(situationDrawing.replaceDrawPoints);
+    replaceSituationDrawPointsRef.current = situationDrawing.replaceDrawPoints;
+
+    const handleEventPolygonCoordChange = useCallback((editable) => {
+        setEventPolygonEditable(editable);
+        skipEventPolygonSyncRef.current = true;
+        replaceEventDrawPointsRef.current(parseLatLngPoints(editable) || []);
+    }, []);
+
+    const handleZonePolygonCoordChange = useCallback((editable) => {
+        setZonePolygonEditable(editable);
+        skipZonePolygonSyncRef.current = true;
+        replaceZoneDrawPointsRef.current(parseLatLngPoints(editable) || []);
+    }, []);
+
+    const handleSituationPolygonCoordChange = useCallback((editable) => {
+        setSituationPolygonEditable(editable);
+        skipSituationPolygonSyncRef.current = true;
+        replaceSituationDrawPointsRef.current(parseLatLngPoints(editable) || []);
+    }, []);
+
+    const eventPolygonCoordError = useMemo(() => {
+        if (eventDrawing.drawMode !== 'polygon' || !eventPolygonEditable.length) return null;
+        return validateEditablePolygonPoints(eventPolygonEditable);
+    }, [eventDrawing.drawMode, eventPolygonEditable]);
+
+    const zonePolygonCoordError = useMemo(() => {
+        if (!isPolygonDrawActive || !zonePolygonEditable.length) return null;
+        return validateEditablePolygonPoints(zonePolygonEditable);
+    }, [isPolygonDrawActive, zonePolygonEditable]);
+
+    const situationPolygonCoordError = useMemo(() => {
+        if (!isSituationDrawingActive || !situationPolygonEditable.length) return null;
+        return validateEditablePolygonPoints(situationPolygonEditable);
+    }, [isSituationDrawingActive, situationPolygonEditable]);
+
+    // Сбрасываем кэш иконок только при смене состава объектов/маркеров, не при сдвиге координат.
+    const objectsIdentityKey = useMemo(() => {
+        const source = zoneObjects.length > 0 ? zoneObjects : objects;
+        return source
+            .map((o) => `${o.id}:${o.marker?.id ?? ''}`)
+            .join('|');
+    }, [zoneObjects, objects]);
+
+    useEffect(() => {
+        clearMarkerIconCache();
+    }, [objectsIdentityKey]);
+
+    useEffect(() => {
+        const markersToFetch = new Map();
+
+        events.forEach((eventItem) => {
+            const marker = eventItem?.marker;
+            if (!marker?.id || !marker.path) return;
+            if (eventMarkerFetchRef.current.has(marker.id)) return;
+            markersToFetch.set(marker.id, resolveMediaUrl(marker.path));
+            eventMarkerFetchRef.current.add(marker.id);
+        });
+
+        markersToFetch.forEach((path, id) => {
+            fetch(path)
+                .then((res) => {
+                    if (!res.ok) {
+                        throw new Error(`Failed to load marker svg: ${path}`);
+                    }
+                    return res.text();
+                })
+                .then((svgText) => {
+                    setEventMarkerSvgs((prev) => {
+                        const next = new Map(prev);
+                        next.set(id, svgText);
+                        return next;
+                    });
+                })
+                .catch(() => {
+                    eventMarkerFetchRef.current.delete(id);
+                });
+        });
+    }, [events]);
+
+    // Синхронизация состояний при переключении режимов
+    useEffect(() => {
+        if (isFullscreen && !prevIsFullscreenRef.current) {
+            setIsMeasureMode(measureMode);
+            setMeasurePoints(measurements);
+        } else if (!isFullscreen && prevIsFullscreenRef.current) {
+            if (onMeasureModeChange) {
+                onMeasureModeChange(isMeasureMode);
+            }
+            if (onMeasurePointsChange) {
+                onMeasurePointsChange(measurePoints);
+            }
+        }
+        prevIsFullscreenRef.current = isFullscreen;
+    }, [isFullscreen, measureMode, measurements, isMeasureMode, measurePoints, onMeasureModeChange, onMeasurePointsChange]);
+
+    useEffect(() => {
+        if (isFullscreen && tableTab) {
+            setFullscreenTab(tableTab);
+        }
+    }, [isFullscreen, tableTab]);
+
+    const showActionRadius = externalShowActionRadius;
+    const resolvedVisibleZones = useMemo(() => {
+        if (visibleZones != null) return visibleZones;
+        if (!showActionRadius) return EMPTY_VISIBLE_ZONES;
+        return buildVisibleZones(zoneObjectsSource, actionZoneFilters);
+    }, [actionZoneFilters, showActionRadius, visibleZones, zoneObjectsSource]);
+    const effectiveMeasureMode = isFullscreen ? isMeasureMode : measureMode;
+    const effectiveMeasurePoints = isFullscreen ? measurePoints : measurements;
+
+    const handleSelectEventTool = useCallback((tool) => {
+        if (effectiveMeasureMode) {
+            if (isFullscreen) {
+                setIsMeasureMode(false);
+            }
+            onMeasureModeChange?.(false);
+        }
+        eventDrawing.selectTool(tool);
+    }, [effectiveMeasureMode, isFullscreen, onMeasureModeChange, eventDrawing]);
+
+    useEffect(() => {
+        if (!eventDrawRequest) return;
+        handleSelectEventTool('point');
+    }, [eventDrawRequest, handleSelectEventTool]);
+
+    const handleEventConfirm = useCallback(() => {
+        if (eventDrawing.validateBeforeSave()) return;
+        setIsEventModalOpen(true);
+    }, [eventDrawing]);
+
+    const handleEventCancel = useCallback(() => {
+        eventDrawing.clearDraft();
+        setIsEventModalOpen(false);
+    }, [eventDrawing]);
+
+    const isEventDrawingActive = eventsDrawingEnabled && Boolean(eventDrawing.drawMode);
+    const isMapDrawingActive = isEventDrawingActive || isPolygonDrawActive || isSituationDrawingActive;
+    const activeMapDrawing = isPolygonDrawActive
+        ? polygonDrawing
+        : isSituationDrawingActive
+            ? situationDrawing
+            : eventDrawing;
+
+    const handleEventMapClick = useCallback((latlng, map) => {
+        if (!isMapDrawingActive) return;
+        if (isEventPointDraggingRef.current || isEventPointPointerDownRef.current) return;
+        activeMapDrawing.handleMapClick(latlng, map || mapRef.current);
+    }, [isMapDrawingActive, activeMapDrawing]);
+
+    const handleEventMapDblClick = useCallback((latlng, map) => {
+        if (!isMapDrawingActive) return false;
+        if (isEventPointDraggingRef.current || isEventPointPointerDownRef.current) return false;
+        return activeMapDrawing.handleMapDblClick(latlng, map || mapRef.current);
+    }, [isMapDrawingActive, activeMapDrawing]);
+
+    const handleMarkerClickGuarded = useCallback((id) => {
+        if (isMapDrawingActive) return;
+        onMarkerClick?.(id);
+    }, [isMapDrawingActive, onMarkerClick]);
+
+    const handleAltClickAddTarget = useCallback((payload) => {
+        setSelectedCountryIso(null);
+        onAltClickAddTarget?.(payload);
+    }, [onAltClickAddTarget]);
+
+    const isAltAddTargetActive = !isMapDrawingActive && Boolean(onAltClickAddTarget);
+
+    countryClickApiRef.current.isEventDrawingActive = isMapDrawingActive;
+    countryClickApiRef.current.handleEventMapClick = handleEventMapClick;
+    countryClickApiRef.current.setSelectedCountryIso = setSelectedCountryIso;
+    countryClickApiRef.current.onAltClickAddTarget = handleAltClickAddTarget;
+
+    altAddTargetApiRef.current.isEventDrawingActive = isMapDrawingActive;
+    altAddTargetApiRef.current.onAltClickAddTarget = handleAltClickAddTarget;
+
+    useEffect(() => {
+        if (isMapDrawingActive) {
+            setSelectedCountryIso(null);
+        }
+    }, [isMapDrawingActive, setSelectedCountryIso]);
+
+    useEffect(() => {
+        if (!onDemoCountryBoundsRef) return undefined;
+        onDemoCountryBoundsRef.current = (iso) => {
+            const feature = findCountryFeature(geoData, iso);
+            if (!feature) return null;
+            const bounds = L.geoJSON(feature).getBounds();
+            return bounds?.isValid?.() ? bounds : null;
+        };
+        return () => {
+            onDemoCountryBoundsRef.current = null;
+        };
+    }, [geoData, onDemoCountryBoundsRef]);
+
+    // Cleanup zone panel when the "Зона действия" tool is turned off
+    useEffect(() => {
+        if (!showActionRadius) {
+            setPinnedZonePanel(null);
+            setSelectedZoneEntryId(null);
+            setHoveredZoneList([]);
+            setActiveZonePopup(null);
+            zoneHoverControllerRef.current?.clear();
+        }
+    }, [showActionRadius]);
+
+    // Zoom-based marker filtering (supplemented):
+    // Zoom filtering (legacy only):
+    // - Flags: graduated by zoom / order tiers from mapZoomRules
+    // - Non-flag: hidden below non_flag_min_zoom
+    // Bubble mode: no zoom filtering — all selected objects participate in clusters.
+    const flagObjectsForMap = useMemo(() => {
+      if (forceShowAllMarkers || clusterMode === 'bubble') return objects;
+      return filterFlagObjectsForZoom(objects, currentZoom, mapZoomRules);
+    }, [objects, currentZoom, mapZoomRules, clusterMode, forceShowAllMarkers]);
+
+    const nonFlagObjectsForMap = useMemo(() => {
+      if (forceShowAllMarkers || clusterMode === 'bubble') return objects;
+      if (!shouldShowNonFlagMarkers(currentZoom, mapZoomRules)) {
+        return [];
+      }
+      return objects;
+    }, [objects, currentZoom, mapZoomRules, clusterMode, forceShowAllMarkers]);
+
+    useEffect(() => {
+      setRuntimeClusterDistancePx(mapZoomRules?.cluster_distance_px);
+    }, [mapZoomRules]);
+
+    const setClusterMode = useCallback((mode) => {
+      const next = mode === 'bubble' ? 'bubble' : 'legacy';
+      saveMapClusterMode(next);
+      setClusterModeState(next);
+    }, []);
+
+    const allBubbleClusters = useMemo(
+      () => [...flagBubbles, ...nonFlagBubbles],
+      [flagBubbles, nonFlagBubbles],
+    );
+
+    const bubbleModeSingles = useMemo(() => {
+      if (clusterMode !== 'bubble') return [];
+      const result = [];
+      (markerData.clusteredObjects || []).forEach((obj) => {
+        if (selectedSet.has(obj.id) && isFlagMarker(obj)) {
+          result.push({ ...obj, _bubbleSingleIsFlag: true });
+        }
+      });
+      (nonFlagData.groupedObjects || []).forEach((obj) => {
+        if (selectedSet.has(obj.id) && isNonFlagMarker(obj) && !obj.isHidden) {
+          result.push({ ...obj, _bubbleSingleIsFlag: false });
+        }
+      });
+      return result;
+    }, [clusterMode, markerData.clusteredObjects, nonFlagData.groupedObjects, selectedSet]);
+
+    // Force-clear nonFlagData when zooming out below non_flag_min_zoom (legacy only).
+    // NonFlagLabelGeneration may not emit a "clear" when its objects prop shrinks,
+    // so we ensure the rendered non-flag markers (and GroupCircle) disappear.
+    useEffect(() => {
+      if (forceShowAllMarkers || clusterMode === 'bubble') return;
+      if (!shouldShowNonFlagMarkers(currentZoom, mapZoomRules)) {
+        setNonFlagData({ iconsById: {}, groupedObjects: [], svgCache: new Map() });
+      }
+    }, [currentZoom, mapZoomRules, clusterMode, forceShowAllMarkers]);
+
+    // Зоны действия: состояния фильтров (actionZoneFilters, showZoneIntersections) и UI панели
+    // теперь живут в Formular (sidebar). Здесь только потребление переданных props для рендера зон и точек.
+    // (логика toggle/синхронизации и доступные типы — в родителе)
+
+    useEffect(() => {
+        const handleEsc = (e) => {
+            if (e.key === "Escape") {
+                if (pinnedZonePanel) {
+                    setPinnedZonePanel(null);
+                    setSelectedZoneEntryId(null);
+                    setHoveredZoneList([]);
+                    setActiveZonePopup(null);
+                    zoneHoverControllerRef.current?.clear();
+                } else if (pinnedGroupId) {
+                    setPinnedGroupId(null);
+                }
+            }
+        };
+        document.addEventListener("keydown", handleEsc);
+        return () => document.removeEventListener("keydown", handleEsc)
+    }, [pinnedGroupId, pinnedZonePanel]);
+
+    useEffect(() => {
+        let raf = 0;
+        const resize = () => {
+            raf = 0;
+            if (freezeMapLayoutRef.current) return;
+            const map = mapRef.current;
+            if (!map) return;
+            try {
+                map.invalidateSize({ animate: false, pan: false });
+            } catch {
+                try {
+                    map.invalidateSize();
+                } catch {
+                    // карта ещё без размеров
+                }
+            }
+            const ml = maplibreMapRef.current;
+            if (ml?.resize) {
+                try {
+                    ml.resize();
+                } catch {
+                    // MapLibre ещё без холста
+                }
+            }
+        };
+        const observer = new ResizeObserver(() => {
+            if (freezeMapLayoutRef.current) return;
+            if (raf) return;
+            raf = requestAnimationFrame(resize);
+        });
+        if (containerRef.current) {
+            observer.observe(containerRef.current);
+        }
+        return () => {
+            observer.disconnect();
+            if (raf) cancelAnimationFrame(raf);
+        };
+    }, []);
+
+    // На время CSS-наклона фиксируем пиксельный размер карты: родитель сжимается
+    // через overflow/transform, Leaflet не перерисовывает тайлы каждый кадр.
+    useEffect(() => {
+        const el = containerRef.current;
+        if (!el || !freezeMapLayout) return undefined;
+        const rect = el.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return undefined;
+        el.style.setProperty('--tableau-freeze-w', `${Math.round(rect.width)}px`);
+        el.style.setProperty('--tableau-freeze-h', `${Math.round(rect.height)}px`);
+        return () => {
+            el.style.removeProperty('--tableau-freeze-w');
+            el.style.removeProperty('--tableau-freeze-h');
+            const map = mapRef.current;
+            if (!map) return;
+            const restore = () => {
+                try {
+                    map.invalidateSize({ animate: false, pan: false });
+                } catch {
+                    try { map.invalidateSize(); } catch { /* ignore */ }
+                }
+                const ml = maplibreMapRef.current;
+                if (ml?.resize) {
+                    try { ml.resize(); } catch { /* ignore */ }
+                }
+            };
+            // После снятия freeze даём layout догнать 100% контейнер.
+            requestAnimationFrame(() => {
+                restore();
+                requestAnimationFrame(restore);
+            });
+            window.setTimeout(restore, 120);
+        };
+    }, [freezeMapLayout]);
+
+    useEffect(() => {
+        if (!mapRef.current) return undefined;
+        const map = mapRef.current;
+        const t0 = setTimeout(() => map.invalidateSize(), 0);
+        const t1 = setTimeout(() => map.invalidateSize(), 100);
+        return () => {
+            clearTimeout(t0);
+            clearTimeout(t1);
+        };
+    }, [isFullscreen]);
+
+    useEffect(() => {
+        if (!isFullscreen) {
+            closeFullscreenPanel();
+            setIsDockVisible(true);
+        }
+    }, [isFullscreen, closeFullscreenPanel]);
+
+    useEffect(() => {
+        if (!isDemoPlayback) setDemoShowDock(false);
+    }, [isDemoPlayback]);
+
+    useEffect(() => {
+        // Click outside measure menu (top bar tools)
+        const handleClickOutside = (e) => {
+            if (measureMenuRef.current && !measureMenuRef.current.contains(e.target)) {
+                setIsMeasureMenuOpen(false);
+            }
+        };
+        
+        if (isMeasureMenuOpen) {
+            document.addEventListener("mousedown", handleClickOutside);
+            return () => document.removeEventListener("mousedown", handleClickOutside);
+        }
+    }, [isMeasureMenuOpen]);
+
+    useEffect(() => {
+        if (embed) return undefined;
+        fetch("/geo/custom.geo.json")
+            .then((res) => {
+                if (!res.ok) throw new Error(`GeoJSON HTTP ${res.status}`);
+                return res.json();
+            })
+            .then(setGeoData)
+            .catch((err) => console.warn("Не удалось загрузить границы стран:", err));
+        return undefined;
+    }, [embed]);
+
+    const onEachCountry = useCallback((feature, layer) => {
+        const featureId = feature.id || feature.prperties?.id;
+        const countryIso = feature.properties?.ISO_A2 || feature.properties?.iso_a2 || feature.id;
+
+        layer.on({
+            click: (e) => {
+                const api = countryClickApiRef.current;
+                if (api.isEventDrawingActive) {
+                    L.DomEvent.stopPropagation(e);
+                    api.handleEventMapClick?.(e.latlng, e.target._map);
+                    return;
+                }
+                if (e.originalEvent?.altKey && api.onAltClickAddTarget) {
+                    L.DomEvent.stopPropagation(e);
+                    api.onAltClickAddTarget({
+                        lat: e.latlng.lat,
+                        lng: e.latlng.lng,
+                        countryIso,
+                    });
+                    return;
+                }
+                // Не открываем модальное окно если нажат Ctrl (в режиме измерения для добавления точки)
+                if (e.originalEvent.ctrlKey) {
+                    return;
+                }
+                api.setSelectedCountryIso?.(countryIso);
+            }
+        })
+        layer.on({
+            mouseover: (e) => e.target.setStyle({fillOpacity: 0.1, color: "#85d5f5"}),
+            mouseout: (e) => e.target.setStyle({fillOpacity: 0, color: "#FFFFFF"})  
+        });
+        layer.featureId = featureId;
+    }, []);
+
+    const countryStyle = useMemo(() => ({
+        color: "#FFFFFF",
+        weight: 0,
+        fillOpacity: 0
+    }), []);
+    
+    const toggleFullscreen = () => {
+        setIsFullscreen((v) => !v);
+    };
+
+    const handleMarkersReady = useCallback((data) => {
+        setMarkerData(data);
+        setFlagBubbles(data?.bubbles || []);
+    }, []);
+
+    const handleNonFlagMarkersReady = useCallback((data) => {
+        setNonFlagData(data);
+        setNonFlagBubbles(data?.bubbles || []);
+    }, []);
+
+    // Используем clusteredObjects для отображения маркеров (с примененными офсетами)
+    // Исключаем non-flag объекты - они будут отображаться отдельно
+    // Memoized + use a Set for O(1) selected check to reduce work on re-renders
+    const displayedObjectsForMarkers = useMemo(() => {
+        return (markerData.clusteredObjects || []).filter(obj => 
+            selectedSet.has(obj.id) && isFlagMarker(obj)
+        );
+    }, [markerData.clusteredObjects, selectedSet]);
+
+    const handleMeasureAddPoint = ({ lat, lng }) => {
+        setMeasurePoints((prev) => [...prev, { id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, lat, lng }]);
+    };
+
+    // Единый обработчик клика по карте для MapEventBridge.
+    // Сохраняем в ref (переприсваивание дёшево и не вызывает перемонтирования
+    // моста). Три независимых блока полностью повторяют прежние отдельные
+    // обработчики (клик по карте, режим измерения, контекст события) и порядок
+    // их срабатывания — каждый блок изолирован своим замыканием, чтобы `return`
+    // прерывал только свою секцию, как это было у отдельных useMapEvents.
+    mapEventApiRef.current.onClick = (e, map) => {
+        // 1) Клик по карте: закрытие меню группы / панели зон
+        (() => {
+            if (suppressNextMapClickRef.current) {
+                suppressNextMapClickRef.current = false;
+                return;
+            }
+            if (pinnedGroupId) {
+                setPinnedGroupId(null);
+                setHoveredGroupId(null);
+            }
+            setPinnedGroupId(null);
+            handleZonePanelClose();
+        })();
+
+        // 2b) Выбор точки уязвимости на карте
+        (() => {
+            if (!vulnerabilityPickRef.current || !onVulnerabilityMapPick) return;
+            onVulnerabilityMapPick({ lat: e.latlng.lat, lng: e.latlng.lng });
+        })();
+
+        // 2c) Правка текста демонстрации: клик ставит блок в точку карты / экрана
+        (() => {
+            if (!demoTextEditDraft || !onDemoTextEditChange) return;
+            if (e.originalEvent?.target?.closest?.('.demo-text__anchor--edit')) return;
+            if (e.originalEvent?.target?.closest?.('.demo-text-map-editor')) return;
+            if (demoTextEditDraft.anchor === 'geo') {
+                onDemoTextEditChange({
+                    ...demoTextEditDraft,
+                    lat: e.latlng.lat,
+                    lng: e.latlng.lng,
+                });
+                return;
+            }
+            const container = map.getContainer();
+            const point = map.mouseEventToContainerPoint(e.originalEvent);
+            const x = Math.min(1, Math.max(0, point.x / container.clientWidth));
+            const y = Math.min(1, Math.max(0, point.y / container.clientHeight));
+            onDemoTextEditChange({
+                ...demoTextEditDraft,
+                screen: { ...(demoTextEditDraft.screen || {}), x, y },
+            });
+        })();
+
+        // 2) Режим измерения: Ctrl+клик добавляет точку
+        (() => {
+            const isActive = effectiveMeasureMode;
+            const onAddPoint = isFullscreen ? handleMeasureAddPoint : onAddMeasurePoint;
+            if (!isActive || !onAddPoint) return;
+            if (!e.originalEvent || !e.originalEvent.ctrlKey) return;
+            const { lat, lng } = e.latlng;
+            onAddPoint({ lat, lng });
+        })();
+
+        // 3) Рисование события: клик по карте при выбранном инструменте
+        (() => {
+            handleEventMapClick(e.latlng, map);
+        })();
+
+        // 4) Alt+клик: добавление объекта
+        (() => {
+            const api = altAddTargetApiRef.current;
+            if (!e.originalEvent?.altKey || api.isEventDrawingActive || !api.onAltClickAddTarget) return;
+            api.onAltClickAddTarget({
+                lat: e.latlng.lat,
+                lng: e.latlng.lng,
+            });
+        })();
+    };
+
+    mapEventApiRef.current.onDblClick = (e, map) => {
+        if (e.originalEvent?.altKey) return false;
+        return handleEventMapDblClick(e.latlng, map);
+    };
+
+    // Трекер координат курсора (обновляет DOM напрямую, без ре-рендера React).
+    mapEventApiRef.current.onMouseMove = (e) => {
+        if (demoSuspendMap) return;
+        if (isEventPointDraggingRef.current) return;
+        if (isEventPointPointerDownRef.current) return;
+        if (eventsDrawingEnabled && eventDrawing.drawMode) {
+            eventDrawing.handleMapMove(e.latlng);
+        }
+        if (isPolygonDrawActive) {
+            polygonDrawing.handleMapMove(e.latlng);
+        }
+        if (isSituationDrawingActive) {
+            situationDrawing.handleMapMove(e.latlng);
+        }
+        const el = cursorCoordsRef.current;
+        if (!el) return;
+        el.textContent = `${e.latlng.lat.toFixed(6)}, ${e.latlng.lng.toFixed(6)}`;
+        el.style.display = 'block';
+    };
+    mapEventApiRef.current.onMouseOut = () => {
+        const el = cursorCoordsRef.current;
+        if (el) el.style.display = 'none';
+    };
+
+    // Новый обработчик hover: синхронизирует локальное состояние и родительский callback
+    const handleMarkerHover = useCallback((targetId) => {
+        if (isMapDrawingActive) return;
+        if (skipZoneHoverUpdatesRef.current) return;
+        if (lastMarkerHoverRef.current === targetId) return;
+        lastMarkerHoverRef.current = targetId;
+        zoneHoverControllerRef.current?.setHovered(targetId ? [targetId] : []);
+        onMarkerHover?.(targetId);
+    }, [onMarkerHover, isMapDrawingActive]);
+
+    const updateGroupHover = useCallback((groupId) => {
+        if (isMapDrawingActive) return;
+        if (skipZoneHoverUpdatesRef.current) return;
+        setHoveredGroupId(groupId);
+        if (!groupId) {
+            zoneHoverControllerRef.current?.clear();
+            return;
+        }
+        const memberIds = (nonFlagData.groupedObjects || [])
+            .filter((o) => o.groupId === groupId && !o.isGroupIcon && o.id)
+            .map((o) => o.id);
+        zoneHoverControllerRef.current?.setHovered(memberIds);
+    }, [nonFlagData.groupedObjects, isMapDrawingActive]);
+
+    const handleZonePanelClose = useCallback(() => {
+        setPinnedZonePanel(null);
+        setSelectedZoneEntryId(null);
+        setHoveredZoneList([]);
+        setActiveZonePopup(null);
+        zoneHoverControllerRef.current?.clear();
+    }, []);
+
+    const handleZonePopupClose = useCallback(() => {
+        setActiveZonePopup(null);
+    }, []);
+
+    const handleZoneHoverChange = useCallback((candidates) => {
+        if (!isFullscreen || pinnedZonePanel) {
+            if (!pinnedZonePanel) setHoveredZoneList([]);
+            return;
+        }
+        const list = candidates || [];
+        setHoveredZoneList((prev) => {
+            if (prev.length === list.length && prev.every((z, i) => z.entryId === list[i]?.entryId)) {
+                return prev;
+            }
+            return list;
+        });
+    }, [isFullscreen, pinnedZonePanel]);
+
+    useEffect(() => {
+        if (!isFullscreen) {
+            setHoveredZoneList([]);
+            setPinnedZonePanel(null);
+            setSelectedZoneEntryId(null);
+            setActiveZonePopup(null);
+            zoneHoverControllerRef.current?.clear();
+        }
+    }, [isFullscreen]);
+
+    const handleZonePanelSelect = useCallback((entryId) => {
+        setSelectedZoneEntryId(entryId);
+        zoneHoverControllerRef.current?.setHoveredEntries([entryId]);
+        const zone = pinnedZonePanel?.zones?.find((z) => z.entryId === entryId);
+        const payload = buildZonePopupPayload(zone);
+        if (payload) {
+            setActiveZonePopup(payload);
+            setActiveZonePopupVersion((v) => v + 1);
+        }
+    }, [pinnedZonePanel]);
+
+    const handleZoneClickAt = useCallback((e, candidates) => {
+        if (isMapDrawingActive) {
+            handleEventMapClick(e.latlng, e.target?._map);
+            return;
+        }
+        if (!candidates?.length || !isFullscreen) return;
+
+        suppressNextMapClickRef.current = true;
+
+        const chosen = candidates[0];
+        // Клик по зоне должен ВЫДЕЛИТЬ объект (checked=true). Ранее вызывалось
+        // без второго аргумента, из-за чего toggleIdInList трактовал checked как
+        // false и пытался снять выделение — объект не выбирался.
+        if (onCheckboxChange && !selectedSet.has(chosen.obj.id)) {
+            onCheckboxChange(chosen.obj.id, true);
+        }
+
+        setPinnedZonePanel({ zones: candidates });
+        setHoveredZoneList(candidates);
+        setSelectedZoneEntryId(null);
+        setActiveZonePopup(null);
+        zoneHoverControllerRef.current?.setHoveredEntries(candidates.map((z) => z.entryId));
+    }, [isFullscreen, onCheckboxChange, selectedSet, isMapDrawingActive, handleEventMapClick]);
+
+    const fullscreenMeasurements = useMemo(() => {
+        return measurePoints.map((point, idx) => {
+            if (idx === 0) {
+                return { ...point, index: idx + 1, distance: 0 };
+            }
+            const prev = measurePoints[idx - 1];
+            return { ...point, index: idx + 1, distance: calcDistanceMeters(prev, point) };
+        });
+    }, [measurePoints]);
+
+    const measureOverlayPoints = isFullscreen ? fullscreenMeasurements : effectiveMeasurePoints;
+
+    const visibleIntersections = useMemo(() => {
+        if (!showActionRadius || !showZoneIntersections || !intersections?.length) return [];
+        const selected = new Set(selectedIntersections);
+        return intersections.filter((point) => selected.has(point.id));
+    }, [showActionRadius, showZoneIntersections, intersections, selectedIntersections]);
+
+    const fullscreenTabCounts = useMemo(() => ({
+        objects: objects?.length ?? 0,
+        events: events?.length ?? 0,
+        zones: showActionRadius ? (intersections?.length ?? 0) : 0,
+        situations: situations?.length ?? 0,
+    }), [objects, events, intersections, situations, showActionRadius]);
+
+    const handleFsToggleMeasure = useCallback(() => {
+        setIsMeasureMode((prev) => {
+            const next = !prev;
+            if (!next) setMeasurePoints([]);
+            return next;
+        });
+        setIsMeasureMenuOpen(false);
+    }, []);
+
+    const handleFsClearMeasure = useCallback(() => {
+        setMeasurePoints([]);
+        setIsMeasureMenuOpen(false);
+    }, []);
+
+    const handleFsClusterLegacy = useCallback(() => {
+        setClusterMode('legacy');
+        setIsMeasureMenuOpen(false);
+    }, []);
+
+    const handleFsClusterBubble = useCallback(() => {
+        setClusterMode('bubble');
+        setIsMeasureMenuOpen(false);
+    }, []);
+
+    const handleFsResetAll = useCallback(() => {
+        onResetAllMapState?.();
+        setIsMeasureMenuOpen(false);
+    }, [onResetAllMapState]);
+
+    const panelBodyProps = {
+        showActionRadius,
+        overlayEnabledById,
+        currentZoom,
+        toggleOverlayLayer,
+        setAllOverlayLayers,
+        objects,
+        zoneObjects,
+        targetTypes,
+        filterCountry,
+        onFilterCountryChange,
+        filterType,
+        onFilterTypeChange,
+        filterTitle,
+        onFilterTitleChange,
+        selectedObj,
+        onCheckboxChange,
+        onSelectionChange,
+        handleMarkerClickGuarded,
+        hoveredTargetId,
+        setHoveredTargetId,
+        mapRef,
+        onEditClick,
+        onDeleteClick,
+        eventsLoading,
+        eventsError,
+        countriesList,
+        eventTypesList,
+        eventsFilters,
+        onEventsFiltersChange,
+        events,
+        selectedEventIds,
+        onEventCheckboxChange,
+        onEventFlyTo,
+        onEventEdit,
+        onEventDelete,
+        actionZoneAvailableByCountry,
+        actionZoneFilters,
+        showZoneIntersections,
+        setShowZoneIntersections,
+        toggleZoneLeaf,
+        toggleAllForActionType,
+        toggleAllForCountry,
+        resetZoneFilters,
+        globalActionTypeCatalog,
+        quickSelectLeaves,
+        quickSelectCountries,
+        quickSelectCombo,
+        toggleQuickSelectLeaf,
+        toggleAllQuickSelectLeavesForType,
+        setAllQuickSelectLeaves,
+        toggleQuickSelectCountry,
+        setAllQuickSelectCountries,
+        considerTerrain,
+        onConsiderTerrainChange,
+        losComputingCount,
+        losZonesCount,
+        equipmentZoneDiagnostics,
+        intersections,
+        selectedIntersections,
+        onIntersectionToggle,
+        onSelectAllIntersections,
+        situationsLoading,
+        situationsError,
+        situationsFilters,
+        onSituationsFiltersChange,
+        situations,
+        selectedSituationIds,
+        onSituationCheckboxChange,
+        onSituationRowClick,
+        onSituationFlyTo,
+        onSituationEdit,
+        onSituationDelete,
+        onSituationCreate,
+        highlightedSituationId,
+        activeSituationTimeline,
+        timelineRevisionId,
+        onTimelineRevisionSelect,
+        onTimelineRevisionEdit,
+        onTimelineRevisionDelete,
+        canEditSituations,
+        canDeleteSituations,
+        canEditTargets,
+        onOpenAddTarget,
+        onSelectEventTool: handleSelectEventTool,
+    };
+
+    const handlePolygonDrawConfirm = useCallback(() => {
+        if (!polygonDrawing.isReady()) {
+            polygonDrawing.validateBeforeSave();
+            return;
+        }
+        onPolygonDrawComplete?.(polygonDrawing.drawPoints);
+    }, [polygonDrawing, onPolygonDrawComplete]);
+
+    const handleSituationDrawConfirm = useCallback(() => {
+        const completed = situationCompletedPolygons || [];
+        const active = situationDrawing.drawPoints || [];
+        const activeClosed = situationDrawing.polygonClosed;
+
+        if (active.length > 0 && !activeClosed) {
+            situationDrawing.validateBeforeSave();
+            return;
+        }
+
+        const all = [...completed];
+        if (active.length >= 3 && activeClosed) {
+            all.push(active);
+        }
+
+        if (all.length === 0) {
+            situationDrawing.validateBeforeSave();
+            return;
+        }
+
+        onSituationDrawConfirm?.(all);
+    }, [situationCompletedPolygons, situationDrawing, onSituationDrawConfirm]);
+
+    const handleSituationFinishContour = useCallback(() => {
+        if (!situationDrawing.finishPolygon()) return;
+        const points = situationDrawing.drawPoints;
+        if (points.length < 3) return;
+        onSituationDrawPolygonsChange((prev) => [...(prev || []), points]);
+        onSituationDrawPointsChange([]);
+    }, [
+        situationDrawing,
+        onSituationDrawPolygonsChange,
+        onSituationDrawPointsChange,
+    ]);
+
+    const handleSituationAddTerritory = useCallback(() => {
+        if (!canAddSituationTerritory) return;
+        onSituationDrawPointsChange([]);
+    }, [canAddSituationTerritory, onSituationDrawPointsChange]);
+
+    const isMapDrawingEvent = isMapDrawingActive;
+    const fsDockVisible = isDemoPlayback ? demoShowDock : isDockVisible;
+
+    return (
+        <div
+            className={`map ${embed ? "map--embed " : ""}${isFullscreen ? "map--fullscreen" : ""}${isFullscreen && isSidebarOpen ? " map--fs-panel-open" : ""}${isFullscreen && !fsDockVisible ? " map--fs-dock-hidden" : ""}${isMapDrawingEvent ? " map--drawing-event" : ""}${((demoPlayback?.isActive || demoTextEditDraft) && !embed) ? " map--demo" : ""}${isDemoPlayback && demoShowDock && !embed ? " map--demo-dock" : ""}${freezeMapLayout ? " map--layout-frozen" : ""}${demoSuspendMap ? " map--demo-suspend" : ""}`}
+            ref={containerRef}
+        >
+            {isFullscreen && !embed && (
+                <>
+                    <MapFullscreenTopBar
+                        toolsMenuRef={measureMenuRef}
+                        isToolsOpen={isMeasureMenuOpen}
+                        onToggleTools={() => setIsMeasureMenuOpen((v) => !v)}
+                        effectiveMeasureMode={effectiveMeasureMode}
+                        measurePointsLength={measurePoints.length}
+                        clusterMode={clusterMode}
+                        onToggleMeasure={handleFsToggleMeasure}
+                        onClearMeasure={handleFsClearMeasure}
+                        onClusterLegacy={handleFsClusterLegacy}
+                        onClusterBubble={handleFsClusterBubble}
+                        onResetAll={handleFsResetAll}
+                        demoMenu={demoMenu}
+                        favoritesMenu={favoritesMenu}
+                        onExitFullscreen={toggleFullscreen}
+                        canEditTargets={canEditTargets}
+                        onOpenAddTarget={onOpenAddTarget}
+                        canOpenReference={canOpenReference}
+                        onOpenReference={onOpenReference}
+                        canOpenReports={canOpenReports}
+                        onOpenReports={onOpenReports}
+                        searchControl={(
+                            <MapSearchControl
+                                objects={zoneObjectsSource}
+                                countries={countriesList}
+                                geoData={geoData}
+                                mapRef={mapRef}
+                                layout="topbar"
+                            />
+                        )}
+                    />
+                    <MapFullscreenPanel
+                        panelRef={sidebarRef}
+                        isOpen={isSidebarOpen}
+                        dockTab={dockTab || fullscreenTab}
+                        canReadSituations={canReadSituations}
+                        onSelectTab={selectPanelTab}
+                        onClose={closeFullscreenPanel}
+                        onTouchStart={handlePanelTouchStart}
+                        onTouchEnd={handlePanelTouchEnd}
+                        featuresFooter={(
+                            <MapFullscreenPanelFeatures
+                                effectiveMeasureMode={effectiveMeasureMode}
+                                fullscreenMeasurements={fullscreenMeasurements}
+                                onRemoveMeasurePoint={(id) => setMeasurePoints((prev) => prev.filter((p) => p.id !== id))}
+                            />
+                        )}
+                    >
+                        <MapFullscreenPanelBody {...panelBodyProps} dockTab={dockTab ?? fullscreenTab} />
+                    </MapFullscreenPanel>
+                    {fsDockVisible && (
+                    <MapFullscreenDock
+                        dockTab={dockTab}
+                        onOpenDock={openDock}
+                        canReadSituations={canReadSituations}
+                        tabCounts={fullscreenTabCounts}
+                        onHideDock={isDemoPlayback ? hideDemoDock : hideDock}
+                    />
+                    )}
+                    {!fsDockVisible && (
+                        <button
+                            type="button"
+                            className="map-fs-dock-reveal"
+                            title="Показать панели"
+                            aria-label="Показать панели"
+                            onClick={isDemoPlayback ? showDemoDock : showDock}
+                        >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                                <polyline points="15,18 9,12 15,6" />
+                            </svg>
+                            <span>Меню</span>
+                        </button>
+                    )}
+                    <MapFullscreenMeasureBanner
+                        visible={effectiveMeasureMode}
+                        onCancel={() => {
+                            setIsMeasureMode(false);
+                            setMeasurePoints([]);
+                        }}
+                    />
+                </>
+            )}
+
+            <MapContainer
+                ref={mapRef}
+                center={center}
+                zoom={4}
+                minZoom={2}
+                maxZoom={19}
+                style={{height: "100%", width: "100%"}}
+                maxBounds={mapMaxBounds}
+                maxBoundsViscosity={1}
+                zoomControl={!embed}
+                attributionControl={!embed}
+                dragging={!embed}
+                scrollWheelZoom={!embed}
+                doubleClickZoom={!embed}
+                boxZoom={!embed}
+                keyboard={!embed}
+                touchZoom={!embed}
+                preferCanvas={embedLite}
+                fadeAnimation={!embedLite}
+                markerZoomAnimation={!embedLite}
+            >
+                <ZoomTracker onZoomChange={setCurrentZoom} />
+                <EmbedMapFixer enabled={embed} />
+                {!embed && <MapScaleBar isFullscreen={isFullscreen} />}
+                <MapEventBridge apiRef={mapEventApiRef} />
+                {!embed && !isFullscreen && (
+                    <MapSplitHud
+                        toolsOpen={isMeasureMenuOpen}
+                        onToggleTools={() => setIsMeasureMenuOpen((v) => !v)}
+                        toolsMenuRef={measureMenuRef}
+                        effectiveMeasureMode={effectiveMeasureMode}
+                        measurePointsLength={(isFullscreen ? measurePoints : measurements).length}
+                        clusterMode={clusterMode}
+                        onToggleMeasure={() => {
+                            if (isFullscreen) {
+                                setIsMeasureMode((m) => !m);
+                            } else {
+                                onMeasureModeChange?.(!measureMode);
+                            }
+                        }}
+                        onClearMeasure={() => {
+                            if (isFullscreen) setMeasurePoints([]);
+                            else onMeasurePointsChange?.([]);
+                        }}
+                        onClusterLegacy={() => setClusterMode('legacy')}
+                        onClusterBubble={() => setClusterMode('bubble')}
+                        onResetAll={() => onResetAllMapState?.()}
+                        demoMenu={demoMenu}
+                    />
+                )}
+                <DemoMapBridge
+                    onOverlayLayersRef={embed ? undefined : onDemoOverlayLayersRef}
+                    setOnlyOverlayLayers={setOnlyOverlayLayers}
+                    overlayEnabledById={overlayEnabledById}
+                    bindAnimationMap={!embed}
+                />
+                {!embed && (
+                    <DemoInteractionBridge
+                        active={Boolean(demoPlayback?.isActive)}
+                        suspendHold={freezeMapLayout}
+                        onHold={onDemoInteractionHold}
+                        onRelease={onDemoInteractionRelease}
+                    />
+                )}
+                <DemoTextLayer
+                    texts={demoTexts}
+                    active={Boolean(demoPlayback?.isActive)}
+                    editText={embed ? null : demoTextEditDraft}
+                    onEditChange={onDemoTextEditChange}
+                />
+                {(USE_VECTOR_MAP && !embedLite && !demoSuspendMap) ? (
+                    <MapVectorBaseLayer
+                        onMapReady={handleMaplibreReady}
+                        onError={handleMaplibreError}
+                    />
+                ) : (!demoSuspendMap ? (
+                    <>
+                        <TileLayer
+                            url={TILE_RASTER_URL}
+                            minZoom={2}
+                            maxZoom={19}
+                            keepBuffer={embedLite ? 1 : 2}
+                            updateWhenIdle={embedLite}
+                            updateWhenZooming={!embedLite}
+                            attribution='&copy; <a href="https://openmaptiles.org/" target="_blank">OpenMapTiles</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap contributors</a>'
+                        />
+                        {(!embedLite || (activeOverlayLayers && activeOverlayLayers.length > 0)) && (
+                            <MapOverlayLayers activeLayers={activeOverlayLayers} />
+                        )}
+                    </>
+                ) : null)}
+                <LabelGeneration
+                    objects={flagObjectsForMap}
+                    selectedIds={selectedSet}
+                    onMarkersReady={handleMarkersReady}
+                    clusterMode={effectiveClusterMode}
+                />
+                <NonFlagLabelGeneration
+                    objects={nonFlagObjectsForMap}
+                    onMarkersReady={handleNonFlagMarkersReady}
+                    selectedIds={selectedSet}
+                    clusterMode={effectiveClusterMode}
+                />
+                {clusterMode === 'bubble' && !forceShowAllMarkers && (
+                    <BubbleClusterLayer
+                        bubbles={allBubbleClusters}
+                        singles={bubbleModeSingles}
+                        onMarkerClick={handleMarkerClickGuarded}
+                        onMarkerHover={handleMarkerHover}
+                        measureMode={effectiveMeasureMode}
+                        eventDrawingActive={isMapDrawingEvent}
+                        altAddTargetActive={isAltAddTargetActive}
+                        onEventMapClick={handleEventMapClick}
+                        onAltClickAddTarget={handleAltClickAddTarget}
+                    />
+                )}
+                {clusterMode === 'legacy' && !forceShowAllMarkers && (
+                <GroupCircleDisplay 
+                    groupedObjects={nonFlagData.groupedObjects} 
+                    hoveredGroupId={hoveredGroupId} 
+                    pinnedGroupId={pinnedGroupId}
+                    onPinGroup={setPinnedGroupId}
+                    iconsById={nonFlagData.iconsById}
+                    svgCache={nonFlagData.svgCache}
+                    onMarkerClick={handleMarkerClickGuarded}
+                    measureMode={effectiveMeasureMode}
+                    eventDrawingActive={isMapDrawingEvent}
+                    altAddTargetActive={isAltAddTargetActive}
+                    onEventMapClick={handleEventMapClick}
+                    onAltClickAddTarget={handleAltClickAddTarget}
+                    onMarkerHover={handleMarkerHover}
+                />
+                )}
+                {vulnerabilityMapPoints.length > 0 && (
+                    <VulnerabilityPointsLayer points={vulnerabilityMapPoints} />
+                )}
+                {geoData && !embed && !demoSuspendMap && (
+                        <MemoGeoJSON
+                            data={geoData}
+                            onEachFeature={onEachCountry}
+                            style={countryStyle}
+                        />
+                )}
+                {isMapDrawingEvent && !embed && (
+                    <EventDraftLayer
+                        drawMode={
+                            isPolygonDrawActive
+                                ? polygonDrawing.drawMode
+                                : isSituationDrawingActive
+                                    ? situationDrawing.drawMode
+                                    : eventDrawing.drawMode
+                        }
+                        drawPoints={
+                            isPolygonDrawActive
+                                ? polygonDrawing.drawPoints
+                                : isSituationDrawingActive
+                                    ? situationDrawing.drawPoints
+                                    : eventDrawing.drawPoints
+                        }
+                        previewPoint={
+                            isPolygonDrawActive
+                                ? polygonDrawing.previewPoint
+                                : isSituationDrawingActive
+                                    ? situationDrawing.previewPoint
+                                    : eventDrawing.previewPoint
+                        }
+                        previewRectangle={
+                            isPolygonDrawActive
+                                ? polygonDrawing.previewRectangle
+                                : isSituationDrawingActive
+                                    ? situationDrawing.previewRectangle
+                                    : eventDrawing.previewRectangle
+                        }
+                        previewPolygonPositions={
+                            isPolygonDrawActive
+                                ? polygonDrawing.previewPolygonPositions
+                                : isSituationDrawingActive
+                                    ? situationDrawing.previewPolygonPositions
+                                    : eventDrawing.previewPolygonPositions
+                        }
+                        polygonClosed={
+                            isPolygonDrawActive
+                                ? polygonDrawing.polygonClosed
+                                : isSituationDrawingActive
+                                    ? situationDrawing.polygonClosed
+                                    : eventDrawing.polygonClosed
+                        }
+                        mapRef={mapRef}
+                        isEventPointDraggingRef={isEventPointDraggingRef}
+                        isEventPointPointerDownRef={isEventPointPointerDownRef}
+                        onUpdatePoint={
+                            isPolygonDrawActive
+                                ? polygonDrawing.updatePoint
+                                : isSituationDrawingActive
+                                    ? situationDrawing.updatePoint
+                                    : eventDrawing.updatePoint
+                        }
+                        onRemoveVertex={
+                            isPolygonDrawActive
+                                ? polygonDrawing.removeVertexAt
+                                : isSituationDrawingActive
+                                    ? situationDrawing.removeVertexAt
+                                    : eventDrawing.removeVertexAt
+                        }
+                        onInsertVertexOnEdge={
+                            isPolygonDrawActive
+                                ? polygonDrawing.insertVertexAtEdge
+                                : isSituationDrawingActive
+                                    ? situationDrawing.insertVertexAtEdge
+                                    : eventDrawing.insertVertexAtEdge
+                        }
+                        extraClosedPolygons={
+                            isSituationDrawingActive
+                                ? situationExtraClosedPolygons
+                                : EMPTY_DRAW_POINTS
+                        }
+                    />
+                )}
+                {visibleMapEvents.map((item) => (
+                    <EventShapeLayer
+                        key={`event-${item.id}`}
+                        eventItem={item}
+                        markerSvg={item.marker?.id ? eventMarkerSvgs.get(item.marker.id) : null}
+                        isMapDrawingActive={isMapDrawingActive}
+                        demoAnimation={demoAnimation}
+                    />
+                ))}
+                <OperationalSituationLayer
+                    situations={situations}
+                    selectedSituationIds={selectedSituationIds}
+                    activeSituationId={activeSituationId}
+                    timelineRevisionId={timelineRevisionId}
+                    situationRevisions={situationRevisions}
+                    editingSituationId={editingSituationId}
+                    onSituationClick={onSituationClick}
+                    onDemoRevisionChange={onSituationDemoRevisionChange}
+                    demoAnimation={demoAnimation}
+                />
+                {(clusterMode === 'legacy' || forceShowAllMarkers) && (
+                <>
+                <FlagMarkersLayer
+                    markers={displayedObjectsForMarkers}
+                    iconsById={markerData.iconsById}
+                    measureMode={effectiveMeasureMode}
+                    eventDrawingActive={isMapDrawingEvent}
+                    altAddTargetActive={isAltAddTargetActive}
+                    onEventMapClick={handleEventMapClick}
+                    onAltClickAddTarget={handleAltClickAddTarget}
+                    onMarkerClick={handleMarkerClickGuarded}
+                    onMarkerHover={handleMarkerHover}
+                    demoAnimation={demoAnimation}
+                />
+                <NonFlagMarkersLayer
+                    groupedObjects={nonFlagData.groupedObjects}
+                    iconsById={nonFlagData.iconsById}
+                    selectedIds={selectedSet}
+                    currentZoom={currentZoom}
+                    forceShowAllMarkers={forceShowAllMarkers}
+                    pinnedGroupId={pinnedGroupId}
+                    measureMode={effectiveMeasureMode}
+                    eventDrawingActive={isMapDrawingEvent}
+                    altAddTargetActive={isAltAddTargetActive}
+                    onEventMapClick={handleEventMapClick}
+                    onAltClickAddTarget={handleAltClickAddTarget}
+                    onMarkerClick={handleMarkerClickGuarded}
+                    onMarkerHover={handleMarkerHover}
+                    onGroupHover={updateGroupHover}
+                    onPinGroup={setPinnedGroupId}
+                    demoAnimation={demoAnimation}
+                />
+                </>
+                )}
+                <MeasureOverlay points={measureOverlayPoints} />
+                {visibleIntersections.map((point) => (
+                    <Marker
+                        key={`intersection-point-${point.id}`}
+                        position={[point.lat, point.lng]}
+                        icon={getMeasureIcon(point.id)}
+                        interactive={false}
+                    />
+                ))}
+                {showActionRadius && (
+                    <ActionZonesLayer
+                        zoneObjects={zoneObjectsSource}
+                        actionZoneFilters={actionZoneFilters}
+                        visibleZones={resolvedVisibleZones}
+                        hoverController={zoneHoverControllerRef.current}
+                        skipHoverRef={skipZoneHoverUpdatesRef}
+                        isZonePanelPinned={Boolean(pinnedZonePanel)}
+                        onZoneClickAt={handleZoneClickAt}
+                        onZoneHoverChange={handleZoneHoverChange}
+                        considerTerrain={mapConsiderTerrain}
+                        losGeometryByZoneKey={losGeometryByZoneKey}
+                        demoAnimation={demoAnimation}
+                        cullToViewport={!embedLite}
+                    />
+                )}
+
+                {showActionRadius && activeZonePopup && activeZonePopup.centerLat != null && (
+                    <ZoneActionPopupManager
+                        popup={activeZonePopup}
+                        version={activeZonePopupVersion}
+                        onClose={handleZonePopupClose}
+                    />
+                )}
+            </MapContainer>
+            {showActionRadius && !embed && <ActionRadiusLegendButton actionTypes={actionTypes} />}
+            {isFullscreen && showActionRadius && (pinnedZonePanel || hoveredZoneList.length > 0) && (
+                <ZoneHoverListPanel
+                    zones={pinnedZonePanel?.zones ?? hoveredZoneList}
+                    isPinned={Boolean(pinnedZonePanel)}
+                    selectedEntryId={selectedZoneEntryId}
+                    onSelectZone={handleZonePanelSelect}
+                    onClose={handleZonePanelClose}
+                    considerTerrain={mapConsiderTerrain}
+                />
+            )}
+
+            {!embed && !isFullscreen && (
+                <FullscreenControl
+                    isFullscreen={isFullscreen}
+                    onToggle={toggleFullscreen}
+                    sidebarOpen={false}
+                />
+            )}
+            {!embed && !isFullscreen && (
+                <MapSearchControl
+                    objects={zoneObjectsSource}
+                    countries={countriesList}
+                    geoData={geoData}
+                    mapRef={mapRef}
+                />
+            )}
+            {!embed && (
+            <EventDrawingToolbar
+                visible={eventsDrawingEnabled && !isEventModalOpen && !isPolygonDrawActive && !isSituationDrawingActive && !demoTextEditDraft}
+                isEditMode={isEventEditModeActive}
+                activeTool={eventDrawing.selectedTool}
+                drawMode={eventDrawing.drawMode}
+                hint={eventDrawing.getHint()}
+                validationError={eventDrawing.validationError}
+                polygonClosed={eventDrawing.polygonClosed}
+                canFinishPolygon={eventDrawing.drawMode === 'polygon' && eventDrawing.drawPoints.length >= 3 && !eventDrawing.polygonClosed}
+                canUndoPoint={eventDrawing.drawMode === 'polygon' && eventDrawing.drawPoints.length >= 1 && !eventDrawing.polygonClosed}
+                isReady={eventDrawing.isReady()}
+                onSelectTool={handleSelectEventTool}
+                onFinishPolygon={eventDrawing.finishPolygon}
+                onUndoPoint={eventDrawing.undoLastPoint}
+                onConfirm={handleEventConfirm}
+                onCancel={handleEventCancel}
+                polygonCoordPoints={eventPolygonEditable}
+                onPolygonCoordChange={handleEventPolygonCoordChange}
+                polygonCoordError={eventPolygonCoordError}
+            />
+            )}
+            {!embed && demoTextEditDraft && (
+                <DemoTextMapEditor
+                    text={demoTextEditDraft}
+                    onChange={onDemoTextEditChange}
+                    onFinish={onDemoTextEditFinish}
+                    getMapView={() => {
+                        const map = mapRef.current;
+                        if (!map?.getCenter) return null;
+                        const center = map.getCenter();
+                        return { lat: center.lat, lng: center.lng, zoom: map.getZoom() };
+                    }}
+                    alignTextOnMap={(text, axis) => {
+                        const map = mapRef.current;
+                        if (!map?.containerPointToLatLng) return text;
+                        return alignDemoText(text, axis, map);
+                    }}
+                />
+            )}
+            {isPolygonDrawActive && (
+                <InundationDrawBanner
+                    hint={polygonDrawing.getHint()}
+                    validationError={polygonDrawing.validationError}
+                    polygonClosed={polygonDrawing.polygonClosed}
+                    canFinishPolygon={polygonDrawing.drawMode === 'polygon' && polygonDrawing.drawPoints.length >= 3 && !polygonDrawing.polygonClosed}
+                    canUndoPoint={polygonDrawing.drawMode === 'polygon' && polygonDrawing.drawPoints.length >= 1 && !polygonDrawing.polygonClosed}
+                    isReady={polygonDrawing.isReady()}
+                    onFinishPolygon={polygonDrawing.finishPolygon}
+                    onUndoPoint={polygonDrawing.undoLastPoint}
+                    onConfirm={handlePolygonDrawConfirm}
+                    onCancel={onPolygonDrawCancel}
+                    title={polygonDrawSession?.isInundation ? 'Зона затопления' : 'Полигон зоны'}
+                    polygonCoordPoints={zonePolygonEditable}
+                    onPolygonCoordChange={handleZonePolygonCoordChange}
+                    polygonCoordError={zonePolygonCoordError}
+                />
+            )}
+            {isSituationDrawingActive && isSituationModalOpen && (
+                <DismissibleBanner
+                    className="situation-map-edit-hint"
+                    variant="info"
+                    role="status"
+                    message={
+                        situationCompletedPolygons.length > 0
+                            ? `Редактируется территория ${Math.min(
+                                  situationDrawTerritoryIndex + 1,
+                                  situationCompletedPolygons.length,
+                              )} из ${situationCompletedPolygons.length}: перетаскивайте вершины, кликайте по ребру для новой точки`
+                            : 'Редактируйте контур на карте: перетаскивайте вершины, кликайте по ребру для новой точки'
+                    }
+                />
+            )}
+            {isSituationDrawingActive && !isSituationModalOpen && (
+                <SituationDrawingToolbar
+                    visible
+                    hint={situationDrawing.getHint()}
+                    validationError={situationDrawing.validationError}
+                    polygonClosed={situationDrawing.polygonClosed}
+                    canFinishPolygon={situationDrawing.drawMode === 'polygon' && situationDrawing.drawPoints.length >= 3 && !situationDrawing.polygonClosed}
+                    canUndoPoint={situationDrawing.drawMode === 'polygon' && situationDrawing.drawPoints.length >= 1 && !situationDrawing.polygonClosed}
+                    isReady={situationDrawReady}
+                    territoryCount={situationTerritoryCount}
+                    canAddTerritory={canAddSituationTerritory}
+                    onAddTerritory={handleSituationAddTerritory}
+                    onFinishPolygon={handleSituationFinishContour}
+                    onUndoPoint={situationDrawing.undoLastPoint}
+                    onConfirm={handleSituationDrawConfirm}
+                    onCancel={onSituationDrawCancel}
+                    polygonCoordPoints={situationPolygonEditable}
+                    onPolygonCoordChange={handleSituationPolygonCoordChange}
+                    polygonCoordError={situationPolygonCoordError}
+                />
+            )}
+            {!embed && detailSituation && (
+                <SituationDetailPanel
+                    situation={detailSituation}
+                    revisions={filterRevisionsForSituation(situationRevisions, detailSituation.id)}
+                    timelineRevisionId={timelineRevisionId}
+                    onSelectRevision={onSituationRevisionSelect}
+                    onClose={onSituationDetailClose}
+                    onEdit={onSituationEdit}
+                    onEditRevision={canEditSituations ? onTimelineRevisionEdit : undefined}
+                    onDeleteRevision={
+                        canEditSituations && canDeleteSituations
+                            ? onTimelineRevisionDelete
+                            : undefined
+                    }
+                    onNewState={onSituationNewState}
+                />
+            )}
+            {!embed && selectedCountryIso && (
+                <CountryModal 
+                    countryIso={selectedCountryIso}
+                    onClose={() => {
+                        if (onCountryModalClose) onCountryModalClose();
+                        else setSelectedCountryIso(null);
+                    }}
+                    onTargetEdit={(targetId) => {
+                        setSelectedCountryIso(null);
+                        onEditClick?.(targetId);
+                    }}
+                    onTargetOpenDetails={onTargetOpenDetails}
+                    canEditCountry={canEditCountry}
+                    initialCardId={demoPlayback?.isActive ? demoContentCardId : undefined}
+                />
+            )}
+            {!embed && (
+            <DemoPlaybackBar
+                playback={demoPlayback}
+                onToggle={onDemoToggle}
+                onNext={onDemoNext}
+                onPrev={onDemoPrev}
+                onStop={onDemoStop}
+                onGoToStage={onDemoGoToStage}
+                onBlackout={onDemoBlackout}
+            />
+            )}
+            {isEventModalOpen && (
+                <AddEventModal
+                    isOpen={isEventModalOpen}
+                    onClose={() => {
+                        setIsEventModalOpen(false);
+                        handleEventCancel();
+                    }}
+                    drawMode={eventDrawing.drawMode}
+                    drawPoints={eventDrawing.drawPoints}
+                    onDrawPointsChange={eventDrawing.replaceDrawPoints}
+                    onSave={onEventSave}
+                />
+            )}
+            {/* Координаты курсора отображаются всегда (когда доступны), как было реализовано до введения
+                радио "Считывание координат" в контексте инструмента "Зона действия".
+                Ранее при активном showActionRadius координаты скрывались, если не был выбран специальный режим "coords". */}
+            <div ref={cursorCoordsRef} className="map__cursor-coords" style={{ display: 'none' }} />
+            {vectorMapError && USE_VECTOR_MAP && !embed && (
+                <DismissibleBanner
+                    className="map__vector-error"
+                    message={`Ошибка загрузки векторной карты: ${vectorMapError}`}
+                    onDismiss={() => setVectorMapError(null)}
+                />
+            )}
+        </div>
+    );
+}
+
+export default React.memo(MapComponent);

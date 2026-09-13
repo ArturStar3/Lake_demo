@@ -1,0 +1,68 @@
+{
+  "options": {
+    "paths": {
+      "fonts": "fonts",
+      "styles": "styles",
+      "mbtiles": "data",
+      "sprites": "sprites"
+    }
+  },
+  "data": {
+    "openmaptiles": {
+      "mbtiles": "map.mbtiles"
+    }
+  },
+  "styles": {
+    "borders-labels": {
+      "style": "borders-labels.json"
+    },
+    "infolake-unified": {
+      "style": "infolake-unified.json"
+    },
+    "basic": {
+      "style": "basic.json"
+    },
+    "overlay-water": {
+      "style": "overlay-water.json"
+    },
+    "overlay-hydro-labels": {
+      "style": "overlay-hydro-labels.json"
+    },
+    "overlay-railways": {
+      "style": "overlay-railways.json"
+    },
+    "overlay-roads": {
+      "style": "overlay-roads.json"
+    },
+    "overlay-ferry": {
+      "style": "overlay-ferry.json"
+    },
+    "overlay-aeroway": {
+      "style": "overlay-aeroway.json"
+    },
+    "overlay-road-labels": {
+      "style": "overlay-road-labels.json"
+    },
+    "overlay-admin-boundary": {
+      "style": "overlay-admin-boundary.json"
+    },
+    "overlay-mountain-peaks": {
+      "style": "overlay-mountain-peaks.json"
+    },
+    "overlay-house-numbers": {
+      "style": "overlay-house-numbers.json"
+    },
+    "overlay-districts": {
+      "style": "overlay-districts.json"
+    },
+    "overlay-poi-infrastructure": {
+      "style": "overlay-poi-infrastructure.json"
+    },
+    "overlay-poi-transport": {
+      "style": "overlay-poi-transport.json"
+    },
+    "overlay-poi-services": {
+      "style": "overlay-poi-services.json"
+    }
+  }
+}

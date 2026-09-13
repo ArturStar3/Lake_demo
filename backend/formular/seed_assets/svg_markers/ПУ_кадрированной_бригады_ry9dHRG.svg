@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="85" height="47" viewBox="0 0 85 47">
+ <defs>
+     <linearGradient id="id0" gradientUnits="userSpaceOnUse" x1="81.34" y1="11.17" x2="1.4" y2="11.17">
+      <stop class="stop-color__third-color" offset="0" stop-opacity="1"/>
+      <stop class="stop-color__second-color" offset="0.490196" stop-opacity="1"/>
+      <stop class="stop-color__third-color" offset="1" stop-opacity="1"/>
+     </linearGradient>
+ </defs>
+ <g id="Слой_x0020_1">
+  <g id="_2217409508928">
+   <g>
+    <line class="stroke__first-color" fill="none" stroke-width="2.29" stroke-miterlimit="22.9256" x1="81.87" y1="0" x2="81.79" y2= "46.28" />
+    <polygon fill="url(#id0)" fill-opacity="0.701961" points="81.34,21.21 10.93,21.21 0.81,0.88 81.26,1.13 "/>
+    <g>
+     <path class="fill__first-color" fill-rule="nonzero" d="M81.09 1.03l-80.03 0.52 -0.01 -1.01 80.03 -0.52 0.57 0.5 -0.56 0.5zm-0.01 -1.01l0.57 -0 0 0.51 -0.57 -0.5zm-0.56 21.55l0 -21.05 1.13 0 0 21.05 -0.56 0.5 -0.56 -0.5zm1.13 0l0 0.5 -0.56 0 0.56 -0.5zm-70.52 -0.5l69.96 0 0 1.01 -69.96 0 -0.52 -0.3 0.52 -0.71zm0 1.01l-0.37 0 -0.15 -0.3 0.52 0.3zm-9.55 -21.23l10.07 20.53 -1.03 0.4 -10.07 -20.53 0.51 -0.71 0.52 0.3zm-1.03 0.4l-0.34 -0.7 0.85 -0.01 -0.51 0.71z"/>
+    </g>
+    <g>
+     <polygon class="fill__first-color" fill-rule="nonzero" points="81.82,2.39 1.68,2.67 1.67,0.65 81.81,0.38 "/>
+    </g>
+   </g>
+   <g>
+    <polygon class="fill__forth-color" fill-opacity="0.501961" points="11.13,21.57 0.81,0.88 79.23,21.57 "/>
+    <polygon class="stroke__first-color" id="_1" fill="none" stroke-width="0.86" stroke-miterlimit="22.9256" points="11.13,21.57 0.81,0.88 79.23,21.57 "/>
+   </g>
+  </g>
+ </g>
+</svg>

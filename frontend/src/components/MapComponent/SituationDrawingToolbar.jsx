@@ -1,0 +1,98 @@
+import { useState } from 'react';
+import PolygonCoordinateEditor from '../common/PolygonCoordinateEditor/PolygonCoordinateEditor';
+import DismissibleBanner from '../common/DismissibleBanner/DismissibleBanner';
+import './SituationDrawingToolbar.css';
+
+export default function SituationDrawingToolbar({
+  visible,
+  hint,
+  validationError,
+  polygonClosed,
+  canFinishPolygon,
+  canUndoPoint,
+  isReady,
+  territoryCount = 0,
+  canAddTerritory = false,
+  polygonCoordPoints = [],
+  onPolygonCoordChange,
+  polygonCoordError = null,
+  onFinishPolygon,
+  onUndoPoint,
+  onAddTerritory,
+  onConfirm,
+  onCancel,
+}) {
+  const [coordsExpanded, setCoordsExpanded] = useState(true);
+
+  if (!visible) return null;
+
+  return (
+    <div className="situation-draw-toolbar">
+      <div className="situation-draw-toolbar__row">
+        <span className="situation-draw-toolbar__title">Рисование обстановки</span>
+        {territoryCount > 0 && (
+          <span className="situation-draw-toolbar__count">
+            Территорий: {territoryCount}
+          </span>
+        )}
+        <div className="situation-draw-toolbar__actions">
+          {canAddTerritory && onAddTerritory && (
+            <button type="button" className="situation-draw-toolbar__btn" onClick={onAddTerritory}>
+              Добавить территорию
+            </button>
+          )}
+          {canUndoPoint && (
+            <button type="button" className="situation-draw-toolbar__btn" onClick={onUndoPoint}>
+              Отменить точку
+            </button>
+          )}
+          {!polygonClosed && (
+            <button
+              type="button"
+              className="situation-draw-toolbar__btn"
+              onClick={onFinishPolygon}
+              disabled={!canFinishPolygon}
+            >
+              Завершить контур
+            </button>
+          )}
+          <button
+            type="button"
+            className="situation-draw-toolbar__btn situation-draw-toolbar__btn--primary"
+            onClick={onConfirm}
+            disabled={!isReady}
+          >
+            Далее
+          </button>
+          <button type="button" className="situation-draw-toolbar__btn" onClick={onCancel}>
+            Отмена
+          </button>
+        </div>
+      </div>
+      {hint && <p className="situation-draw-toolbar__hint">{hint}</p>}
+      {validationError && (
+        <DismissibleBanner
+          className="situation-draw-toolbar__error"
+          variant="error"
+          message={validationError}
+        />
+      )}
+      <div className="situation-draw-toolbar__coords">
+        <button
+          type="button"
+          className="situation-draw-toolbar__btn"
+          onClick={() => setCoordsExpanded((prev) => !prev)}
+        >
+          {coordsExpanded ? 'Скрыть координаты' : 'Координаты контура'}
+        </button>
+        {coordsExpanded && onPolygonCoordChange && (
+          <PolygonCoordinateEditor
+            points={polygonCoordPoints}
+            onChange={onPolygonCoordChange}
+            error={polygonCoordError}
+          />
+        )}
+      </div>
+    </div>
+  );
+}

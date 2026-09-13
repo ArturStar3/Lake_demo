@@ -1,0 +1,211 @@
+.formular-completion {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.formular-completion__tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.formular-completion__tab {
+  padding: 6px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+  background: var(--il-surface);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.formular-completion__tab--active {
+  border-color: #0d8f9b;
+  background: #f0fafb;
+  font-weight: 600;
+}
+
+.formular-completion__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.formular-completion__row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.formular-completion__row--clickable {
+  cursor: pointer;
+}
+
+.formular-completion__row-button {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background-color 0.15s;
+}
+
+.formular-completion__row-button:hover {
+  background: var(--il-primary-tint);
+}
+
+.formular-completion__row-button:focus-visible {
+  outline: 2px solid #3d5a80;
+  outline-offset: 2px;
+}
+
+.formular-completion__object-button {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.formular-completion__object-button:hover .formular-completion__title {
+  color: #0d8f9b;
+  text-decoration: underline;
+}
+
+.formular-completion__object-button:focus-visible {
+  outline: 2px solid #3d5a80;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.formular-completion__object-cell--clickable {
+  padding: 0;
+}
+
+.formular-completion__object-cell--clickable .formular-completion__object-button {
+  padding: 6px 8px;
+}
+
+.formular-completion__row-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.formular-completion__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--il-text);
+}
+
+.formular-completion__label {
+  font-size: 12px;
+  color: var(--il-text-muted);
+}
+
+.formular-completion__percent {
+  font-size: 12px;
+  font-weight: 600;
+  color: #0a5c64;
+  white-space: nowrap;
+}
+
+.formular-completion__bar {
+  height: 8px;
+  border-radius: 4px;
+  background: #e8ecef;
+  overflow: hidden;
+}
+
+.formular-completion__bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #0d8f9b, #22c55e);
+  transition: width 0.25s ease;
+}
+
+.formular-completion--table {
+  flex: 1;
+  min-height: 0;
+}
+
+.formular-completion--table .formular-completion__tabs {
+  flex-shrink: 0;
+}
+
+.formular-completion__table-wrap {
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.formular-completion--table .formular-completion__table-wrap {
+  flex: 1;
+  min-height: 0;
+}
+
+.formular-completion__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.formular-completion__table th,
+.formular-completion__table td {
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  padding: 6px 8px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.formular-completion__table th {
+  background: #f5f7f8;
+  font-weight: 600;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.formular-completion__table td:first-child,
+.formular-completion__table th:first-child {
+  text-align: left;
+  min-width: 140px;
+  position: sticky;
+  left: 0;
+  background: var(--il-surface);
+  z-index: 1;
+}
+
+.formular-completion__table th:first-child {
+  background: #f5f7f8;
+  z-index: 3;
+}
+
+.formular-completion__cell--filled {
+  background: #dcfce7;
+}
+
+.formular-completion__cell--empty {
+  background: var(--il-surface-2);
+}
+
+.formular-completion__empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--il-text-muted);
+}

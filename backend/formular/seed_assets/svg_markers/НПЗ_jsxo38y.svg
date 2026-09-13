@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="47" height="47" viewBox="0 0 306.65 306.65">
+ <defs>
+     <clipPath id="id0">
+      <path d="M-0 0l306.65 0 0 306.65 -306.65 0 0 -306.65z"/>
+     </clipPath>
+ </defs>
+ <g id="Слой_x0020_1">
+  <g id="_2180866581040">
+   <circle class="stroke__first-color" fill="#FEFEFE" stroke-width="8.57" stroke-miterlimit="22.9256" cx="143.97" cy="146.88" r="113.66"/>
+   <g>
+    <ellipse fill="#FEFEFE" stroke="#2B2A29" stroke-width="8.57" stroke-miterlimit="22.9256" cx="191.53" cy="171.35" rx="34.45" ry="31.79"/>
+    <line fill="none" stroke="#2B2A29" stroke-width="8.57" stroke-miterlimit="22.9256" x1="157.56" y1="166.03" x2="225.58" y2= "166.49" />
+    <line fill="none" stroke="#2B2A29" stroke-width="8.57" stroke-miterlimit="22.9256" x1="157.51" y1="179.93" x2="225.52" y2= "180.39" />
+    <line fill="none" stroke="#2B2A29" stroke-width="12.85" stroke-miterlimit="22.9256" x1="56.89" y1="209.6" x2="218.46" y2= "209.6" />
+    <line fill="none" stroke="#2B2A29" stroke-width="8.57" stroke-miterlimit="22.9256" x1="73.01" y1="209.6" x2="72.66" y2= "124.09" />
+    <line fill="none" stroke="#2B2A29" stroke-width="8.57" stroke-miterlimit="22.9256" x1="117" y1="209.25" x2="116.64" y2= "123.73" />
+    <line fill="none" stroke="#2B2A29" stroke-width="8.57" stroke-miterlimit="22.9256" x1="72.73" y1="140.91" x2="116.71" y2= "140.73" />
+    <line fill="none" stroke="#2B2A29" stroke-width="8.57" stroke-miterlimit="22.9256" x1="72.44" y1="150.46" x2="116.43" y2= "150.28" />
+    <path fill="none" stroke="#2B2A29" stroke-width="8.57" stroke-miterlimit="22.9256" d="M72.66 124.09c4.42,-23.95 40.11,-22.67 43.98,-0.35"/>
+    <line fill="none" stroke="#2B2A29" stroke-width="8.57" stroke-miterlimit="22.9256" x1="94.06" y1="64.15" x2="94.47" y2= "106.7" />
+    <line fill="none" stroke="#2B2A29" stroke-width="8.57" stroke-miterlimit="22.9256" x1="191.09" y1="103.94" x2="191.5" y2= "138.87" />
+    <line fill="none" stroke="#2B2A29" stroke-width="8.57" stroke-miterlimit="22.9256" x1="93.27" y1="64.95" x2="191.65" y2= "65.65" />
+    <path fill="none" stroke="#2B2A29" stroke-width="8.57" stroke-miterlimit="22.9256" d="M191.65 65.65c39.67,0.12 40.18,38.12 -0.56,38.29"/>
+   </g>
+  </g>
+ </g>
+</svg>

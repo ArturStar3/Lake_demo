@@ -1,0 +1,318 @@
+.filter-panel {
+    position: relative;
+    z-index: 1;
+    margin-bottom: 0;
+}
+
+.filter-panel--embedded {
+    z-index: 2;
+    flex-shrink: 0;
+    margin-bottom: 8px;
+}
+
+.filter-panel--embedded .filter-panel__content {
+    position: static;
+    top: auto;
+    left: auto;
+    right: auto;
+    margin: 0;
+    box-shadow: none;
+    background: var(--il-surface-2);
+    border-color: var(--il-border);
+}
+
+.filter-panel__embedded-reset {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.filter-panel__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    background: var(--il-surface-2);
+    border-radius: 8px;
+    border: 1px solid var(--il-border);
+    margin-bottom: 12px;
+}
+
+.filter-panel__toggle {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--il-text);
+    font-size: 0.95rem;
+    font-weight: 500;
+    transition: background-color 0.2s;
+    border-radius: 8px;
+}
+
+.filter-panel__toggle:hover {
+    background-color: var(--il-hover);
+}
+
+.filter-panel__toggle svg:first-child {
+    color: #008dd2;
+}
+
+.filter-panel__title {
+    flex: 1;
+    text-align: left;
+}
+
+.filter-panel__badge {
+    background-color: #008dd2;
+    color: white;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 12px;
+    min-width: 20px;
+    text-align: center;
+}
+
+.filter-panel__chevron {
+    color: var(--il-text-muted);
+    transition: transform 0.2s ease;
+}
+
+.filter-panel__chevron--expanded {
+    transform: rotate(180deg);
+}
+
+.filter-panel__reset {
+    padding: 6px 14px;
+    margin-right: 8px;
+    background-color: var(--il-surface);
+    border: 1px solid var(--il-border);
+    border-radius: 6px;
+    color: var(--il-text-muted);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.filter-panel__reset:hover {
+    background-color: var(--il-hover);
+    border-color: #008dd2;
+    color: #008dd2;
+}
+
+.filter-panel__content {
+    position: absolute;
+    top: calc(100% + 12px);
+    left: 0;
+    right: 0;
+    padding: 12px 14px 14px;
+    background: var(--il-surface);
+    border: 1px solid var(--il-border);
+    border-radius: 8px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    z-index: 10;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+}
+
+.filter-panel__section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    position: relative;
+}
+
+.filter-panel__label {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--il-text-muted);
+}
+
+.filter-panel__input {
+    border: 1px solid var(--il-border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 0.9rem;
+    font-family: inherit;
+    background: var(--il-input-bg);
+    color: var(--il-text);
+}
+
+.filter-panel__input:focus {
+    outline: none;
+    border-color: #008dd2;
+    box-shadow: 0 0 0 3px rgba(0, 141, 210, 0.1);
+}
+
+.filter-panel__multi-select {
+    position: relative;
+}
+
+.filter-panel__multi-select-trigger {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--il-border);
+    border-radius: 6px;
+    background-color: var(--il-surface);
+    color: var(--il-text);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: border-color 0.2s;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    text-align: left;
+}
+
+.filter-panel__multi-select-trigger:hover {
+    border-color: #008dd2;
+}
+
+.filter-panel__multi-select-trigger:focus {
+    outline: none;
+    border-color: #008dd2;
+    box-shadow: 0 0 0 3px rgba(0, 141, 210, 0.1);
+}
+
+.filter-panel__multi-select-text {
+    flex: 1;
+}
+
+.filter-panel__multi-select-arrow {
+    color: var(--il-text-muted);
+    transition: transform 0.2s ease;
+}
+
+.filter-panel__multi-select-arrow--open {
+    transform: rotate(180deg);
+}
+
+.filter-panel__dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: var(--il-surface);
+    border: 1px solid var(--il-border);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px var(--il-shadow);
+    z-index: 100;
+    max-height: 280px;
+    display: flex;
+    flex-direction: column;
+}
+
+.filter-panel__dropdown-search {
+    padding: 8px;
+    border-bottom: 1px solid var(--il-border);
+}
+
+.filter-panel__search-input {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--il-border);
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-family: inherit;
+    background: var(--il-input-bg);
+    color: var(--il-text);
+}
+
+.filter-panel__search-input:focus {
+    outline: none;
+    border-color: #008dd2;
+    box-shadow: 0 0 0 3px rgba(0, 141, 210, 0.1);
+}
+
+.filter-panel__no-results {
+    padding: 12px;
+    text-align: center;
+    color: var(--il-text-muted);
+    font-size: 0.85rem;
+}
+
+.filter-panel__dropdown-header {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--il-border);
+}
+
+.filter-panel__select-all {
+    background: none;
+    border: none;
+    color: #008dd2;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 0;
+}
+
+.filter-panel__select-all:hover {
+    text-decoration: underline;
+}
+
+.filter-panel__dropdown-list {
+    overflow-y: auto;
+    padding: 4px;
+}
+
+.filter-panel__checkbox-label {
+    display: flex;
+    align-items: center;
+    padding: 8px 10px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.filter-panel__checkbox-label:hover {
+    background-color: var(--il-hover);
+}
+
+.filter-panel__checkbox {
+    margin: 0;
+    margin-right: 10px;
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+    accent-color: #008dd2;
+}
+
+.filter-panel__checkbox-text {
+    font-size: 0.9rem;
+    color: var(--il-text);
+    user-select: none;
+}
+
+.filter-panel__select {
+    padding: 8px 10px;
+    border: 1px solid var(--il-border);
+    border-radius: 6px;
+    background-color: var(--il-surface);
+    color: var(--il-text);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+.filter-panel__select:hover {
+    border-color: #008dd2;
+}
+
+.filter-panel__select:focus {
+    outline: none;
+    border-color: #008dd2;
+    box-shadow: 0 0 0 3px rgba(0, 141, 210, 0.1);
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+    .filter-panel__content {
+        grid-template-columns: 1fr;
+    }
+}

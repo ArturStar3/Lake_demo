@@ -1,0 +1,15 @@
+.git
+.env
+.env.demo
+**/.env
+**/__pycache__
+**/*.pyc
+backend/env
+backend/media
+backend/staticfiles
+frontend/node_modules
+frontend/dist
+tileserver/data/*.mbtiles
+tileserver/data/dem
+*.tar
+*.dump

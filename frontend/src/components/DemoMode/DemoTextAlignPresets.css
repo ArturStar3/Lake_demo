@@ -1,0 +1,50 @@
+.demo-text-align {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+}
+
+.demo-text-align__group {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.demo-text-align__label {
+    font-size: 0.72rem;
+    color: var(--il-text-muted);
+}
+
+.demo-text-align__buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.demo-text-align__btn {
+    flex: 1 1 0;
+    min-width: 0;
+    border: 1px solid var(--il-border);
+    background: var(--il-surface);
+    color: var(--il-text-sec);
+    border-radius: 6px;
+    padding: 5px 8px;
+    font-size: 0.78rem;
+    cursor: pointer;
+}
+
+.demo-text-align__btn:hover:not(:disabled) {
+    background: var(--il-surface-2);
+}
+
+.demo-text-align__btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.demo-text-align__hint {
+    margin: 0;
+    font-size: 0.72rem;
+    color: var(--il-text-muted);
+}

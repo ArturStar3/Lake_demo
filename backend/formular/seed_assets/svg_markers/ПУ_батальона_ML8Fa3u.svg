@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="47" height="47" viewBox="0 0 206 205">
+ <defs>
+    <radialGradient id="id0" gradientUnits="userSpaceOnUse" gradientTransform="matrix(1.16634 -0 -0 1.17328 -18 -9)" cx="108.31" cy="54.34" r="192.74" fx="108.31" fy="54.34">
+     <stop class="stop-color__second-color" offset="0" stop-opacity="1"/>
+     <stop class="stop-color__third-color" offset="1" stop-opacity="1"/>
+    </radialGradient>
+ </defs>
+ <g id="Слой_x0020_1">
+  <g id="_2218168252208">
+   <polygon class="stroke__third-color" fill="url(#id0)" stroke-width="10.04" stroke-miterlimit="22.9256" points="197.31,6.46 197.31,102.22 19.32,52.01 "/>
+   <line class="stroke__first-color" fill="none" stroke-width="10.04" stroke-miterlimit="22.9256" x1="201.12" y1="2.24" x2="200.78" y2= "205.27" />
+  </g>
+ </g>
+</svg>

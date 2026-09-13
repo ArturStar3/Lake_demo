@@ -1,0 +1,121 @@
+.formular-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+}
+
+.formular-modal {
+  background: var(--il-surface);
+  border-radius: 8px;
+  width: 92%;
+  max-width: 1100px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.formular-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 20px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.formular-modal-title-wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.formular-modal-title-block {
+  min-width: 0;
+}
+
+.formular-modal-header h2 {
+  margin: 0;
+  font-size: 1.3rem;
+  color: var(--il-text);
+}
+
+.formular-modal-meta {
+  margin: 6px 0 0;
+  font-size: 0.82rem;
+  color: var(--il-text-muted);
+  line-height: 1.4;
+}
+
+.formular-modal-edit-icon {
+  background: none;
+  border: none;
+  padding: 4px;
+  margin: 0;
+  cursor: pointer;
+  color: var(--il-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  transition: background-color 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+
+.formular-modal-edit-icon:hover {
+  background-color: #f0f0f0;
+  color: var(--il-text);
+}
+
+.formular-modal-edit-icon:focus-visible {
+  outline: 2px solid var(--il-text);
+  outline-offset: 2px;
+}
+
+.formular-modal-close {
+  background: none;
+  border: none;
+  font-size: 2rem;
+  color: var(--il-text-muted);
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+  flex-shrink: 0;
+}
+
+.formular-modal-close:hover {
+  color: var(--il-text);
+}
+
+.formular-modal-content {
+  padding: 18px 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.formular-modal-content .error {
+  color: #e74c3c;
+  font-weight: 500;
+}
+
+.formular-modal-content > p {
+  text-align: center;
+  color: var(--il-text-muted);
+  margin: 40px 0;
+}

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="47" height="47" viewBox="0 0 302.31 302.31">
+ <defs>
+     <clipPath id="id0">
+      <path d="M-0 0l302.31 0 0 302.31 -302.31 0 0 -302.31z"/>
+     </clipPath>
+ </defs>
+ <g id="Слой_x0020_1">
+  <g id="_2218166328048">
+   <circle class="stroke__first-color" fill="#FEFEFE" stroke-width="10.37" stroke-miterlimit="22.9256" cx="138.71" cy="137.87" r="111.09"/>
+   <polyline fill="none" stroke="#2B2A29" stroke-width="4.15" stroke-miterlimit="22.9256" points="72.92,89.1 72.92,170.94 205.51,170.94 205.05,87.27 "/>
+   <line fill="none" stroke="#2B2A29" stroke-width="4.15" stroke-miterlimit="22.9256" x1="110.87" y1="170.6" x2="110.87" y2= "194.84" />
+   <line fill="none" stroke="#2B2A29" stroke-width="4.15" stroke-miterlimit="22.9256" x1="95.2" y1="170.49" x2="95.2" y2= "194.72" />
+   <rect fill="#2B2A29" stroke="#2B2A29" stroke-width="4.15" stroke-miterlimit="22.9256" x="152.47" y="170.94" width="38.41" height="22.4"/>
+  </g>
+ </g>
+</svg>

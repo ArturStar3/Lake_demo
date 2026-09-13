@@ -1,0 +1,65 @@
+.intersection-table {
+    width: 100%;
+    margin-top: 12px;
+}
+
+.intersection-table__title {
+    display: none;
+}
+
+.intersection-table__wrapper {
+    overflow-x: auto;
+}
+
+.intersection-table__content {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.intersection-table__content th {
+    text-align: left;
+    padding: 8px 6px;
+    color: var(--il-text-sec);
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 16px;
+}
+
+.intersection-table__content th:first-child {
+    width: 40px;
+    text-align: left;
+}
+
+.intersection-table__content td {
+    padding: 8px 6px;
+    border-top: 1px solid #eef2f7;
+    font-size: 14px;
+    line-height: 16px;
+}
+
+.intersection-table__content tbody tr:hover td {
+    background-color: var(--il-surface-2);
+}
+
+.intersection-table__objects {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.intersection-table__object-name {
+    display: inline-block;
+    padding: 2px 6px;
+    background-color: var(--il-primary-light);
+    border-radius: 4px;
+    font-size: 12px;
+    color: #0b5073;
+}
+
+.intersection-table__empty {
+    margin-top: 12px;
+    padding: 12px 4px;
+    font-size: 13px;
+    color: var(--il-text-muted);
+    font-style: italic;
+}

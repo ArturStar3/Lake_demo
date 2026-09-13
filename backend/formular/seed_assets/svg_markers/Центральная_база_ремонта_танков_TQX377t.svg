@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="85" height="47" viewBox="0 0 4001.44 2480.26">
+ <defs>
+    <linearGradient id="id0" gradientUnits="userSpaceOnUse" x1="289.52" y1="1240.13" x2="3664.7" y2="1240.13">
+     <stop class="stop-color__forth-color" offset="0" stop-opacity="1"/>
+     <stop class="stop-color__second-color" offset="0.501961" stop-opacity="1"/>
+     <stop class="stop-color__forth-color" offset="1" stop-opacity="1"/>
+    </linearGradient>
+ </defs>
+ <g id="Слой_x0020_1">
+  <g id="_2217409516176">
+   <rect class="fill__second-color stroke__border-color" stroke-width="109.62" stroke-miterlimit="22.9256" x="54.8" y="54.81" width="3891.82" height="2370.65"/>
+   <polygon class="stroke__first-color" fill="url(#id0)" stroke-width="109.62" stroke-miterlimit="22.9256" points="1977.13,2146.89 289.54,1240.13 1977.13,333.37 3664.7,1240.13 "/>
+  </g>
+ </g>
+</svg>

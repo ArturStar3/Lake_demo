@@ -1,0 +1,336 @@
+.demo-playbar {
+    position: fixed;
+    left: 50%;
+    bottom: 12px;
+    transform: translateX(-50%);
+    z-index: 10050;
+    min-width: 0;
+    background: rgba(17, 24, 39, 0.58);
+    color: #f8fafc;
+    border-radius: 8px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(3px);
+    overflow: hidden;
+    transition: opacity 220ms ease, transform 220ms ease;
+}
+
+.demo-playbar--hidden {
+    opacity: 0;
+    transform: translateX(-50%) translateY(12px);
+    pointer-events: none;
+}
+
+.demo-playbar__progress {
+    height: 3px;
+    background: rgba(255, 255, 255, 0.14);
+}
+
+/* Прогресс тянем через scaleX: изменение width пересчитывало бы раскладку
+   на каждом кадре, а трансформация уходит в композитор. */
+.demo-playbar__progress-fill {
+    height: 100%;
+    width: 100%;
+    transform: scaleX(0);
+    transform-origin: left center;
+    background: #4b9bff;
+    will-change: transform;
+}
+
+.demo-playbar__row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px;
+}
+
+.demo-playbar__controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.demo-playbar__controls button {
+    border: none;
+    background: rgba(255, 255, 255, 0.1);
+    color: #f8fafc;
+    border-radius: 6px;
+    width: 28px;
+    height: 26px;
+    cursor: pointer;
+    font-size: 0.78rem;
+    line-height: 1;
+}
+
+.demo-playbar__controls button:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.demo-playbar__play {
+    width: 30px !important;
+    background: rgba(47, 128, 237, 0.85) !important;
+    font-size: 0.9rem !important;
+}
+
+.demo-playbar__play:hover {
+    background: #1d6fd8 !important;
+}
+
+.demo-playbar__info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
+}
+
+.demo-playbar__scenario {
+    font-size: 0.74rem;
+    color: rgba(248, 250, 252, 0.6);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.demo-playbar__step {
+    font-size: 0.9rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.demo-playbar__counter {
+    font-size: 0.78rem;
+    color: rgba(248, 250, 252, 0.7);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    border: 1px solid transparent;
+    background: transparent;
+    border-radius: 6px;
+    padding: 4px 8px;
+    cursor: pointer;
+}
+
+.demo-playbar__counter:hover {
+    border-color: rgba(255, 255, 255, 0.24);
+    color: #f8fafc;
+}
+
+.demo-playbar__pause,
+.demo-playbar__icon-btn {
+    border: none;
+    background: rgba(255, 255, 255, 0.1);
+    color: #f8fafc;
+    border-radius: 6px;
+    width: 32px;
+    height: 30px;
+    cursor: pointer;
+    font-size: 0.78rem;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.demo-playbar__pause:hover,
+.demo-playbar__icon-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.demo-playbar__waiting {
+    font-size: 0.78rem;
+    white-space: nowrap;
+    color: #fde68a;
+    border: 1px solid rgba(253, 230, 138, 0.4);
+    border-radius: 6px;
+    padding: 4px 10px;
+    animation: demo-playbar-waiting 1.6s ease-in-out infinite;
+}
+
+@keyframes demo-playbar-waiting {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.demo-playbar__play--waiting {
+    box-shadow: 0 0 0 2px rgba(253, 230, 138, 0.6);
+}
+
+/* Быстрый переход по этапам */
+
+.demo-playbar__stages {
+    list-style: none;
+    margin: 0;
+    padding: 6px;
+    max-height: 320px;
+    overflow-y: auto;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.demo-playbar__stage {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    border: none;
+    background: transparent;
+    color: rgba(248, 250, 252, 0.82);
+    text-align: left;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.82rem;
+}
+
+.demo-playbar__stage:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.demo-playbar__stage--active {
+    background: rgba(47, 128, 237, 0.32);
+    color: #f8fafc;
+}
+
+.demo-playbar__stage-num {
+    flex-shrink: 0;
+    min-width: 22px;
+    font-variant-numeric: tabular-nums;
+    color: rgba(248, 250, 252, 0.55);
+}
+
+.demo-playbar__stage-title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.demo-playbar__stage-beats {
+    flex-shrink: 0;
+    font-size: 0.72rem;
+    color: rgba(248, 250, 252, 0.5);
+}
+
+/* Затемнение экрана (клавиши B / W) */
+
+.demo-blackout {
+    position: fixed;
+    inset: 0;
+    z-index: 10100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.demo-blackout--black {
+    background: #000;
+}
+
+.demo-blackout--white {
+    background: var(--il-surface);
+}
+
+.demo-blackout__logo {
+    width: 180px;
+    height: 180px;
+    object-fit: contain;
+    border-radius: 24px;
+    pointer-events: none;
+    user-select: none;
+}
+
+.demo-blackout__hint {
+    position: absolute;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.8rem;
+    opacity: 0;
+    transition: opacity 200ms ease;
+    pointer-events: none;
+}
+
+.demo-blackout--black .demo-blackout__hint {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.demo-blackout--white .demo-blackout__hint {
+    color: rgba(0, 0, 0, 0.45);
+}
+
+.demo-blackout:hover .demo-blackout__hint {
+    opacity: 1;
+}
+
+.demo-playbar__step-progress {
+    width: 120px;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.16);
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.demo-playbar__step-progress-fill {
+    height: 100%;
+    width: 100%;
+    transform: scaleX(0);
+    transform-origin: left center;
+    background: #7dd3fc;
+    will-change: transform;
+}
+
+.demo-playbar__exit {
+    border: none;
+    background: rgba(255, 255, 255, 0.1);
+    color: #f8fafc;
+    border-radius: 6px;
+    width: 28px;
+    height: 26px;
+    padding: 0;
+    font-size: 0.72rem;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.demo-playbar__exit:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+/* Во время показа оставляем только непосредственные кнопки управления. */
+.demo-playbar__progress,
+.demo-playbar__stages,
+.demo-playbar__info,
+.demo-playbar__counter,
+.demo-playbar__step-progress,
+.demo-playbar__icon-btn,
+.demo-playbar__waiting {
+    display: none;
+}
+
+/* Во время показа прячем операторские элементы карты.
+   Док и его панель можно вернуть кнопкой «Меню» (класс map--demo-dock). */
+.map--demo .map-fs-topbar,
+.map--demo .map-split-hud__zoom,
+.map--demo .map-split-hud__tools,
+.map--demo .action-radius-legend-button,
+.map--demo:not(.map--demo-dock) .map-fs-dock,
+.map--demo:not(.map--demo-dock) .map-fs-panel {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 200ms ease;
+}
+
+.map--demo .map-fs-dock-reveal {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+@media (max-width: 900px) {
+    .demo-playbar {
+        min-width: 0;
+        width: calc(100% - 24px);
+    }
+
+    .demo-playbar__step-progress {
+        display: none;
+    }
+}

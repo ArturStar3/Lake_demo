@@ -1,0 +1,71 @@
+{
+  "layerMapping": {
+    "countryBordersBold": [
+      "ovl-overlay-admin-boundary-country-boundary-bold"
+    ],
+    "aeroway": [
+      "ovl-overlay-aeroway-aeroway-apron",
+      "ovl-overlay-aeroway-aeroway-taxiway",
+      "ovl-overlay-aeroway-aeroway-runway",
+      "ovl-overlay-aeroway-aerodrome-label"
+    ],
+    "districts": [
+      "ovl-overlay-districts-place-suburb",
+      "ovl-overlay-districts-place-quarter-neighbourhood",
+      "ovl-overlay-districts-place-island"
+    ],
+    "ferry": [
+      "ovl-overlay-ferry-ferry"
+    ],
+    "houseNumbers": [
+      "ovl-overlay-house-numbers-housenumber"
+    ],
+    "hydroLabels": [
+      "ovl-overlay-hydro-labels-water-name-lakeline",
+      "ovl-overlay-hydro-labels-water-name-ocean",
+      "ovl-overlay-hydro-labels-water-name-other"
+    ],
+    "mountainPeaks": [
+      "ovl-overlay-mountain-peaks-mountain-peak"
+    ],
+    "poiInfrastructure": [
+      "ovl-overlay-poi-infrastructure-poi-infrastructure"
+    ],
+    "poiServices": [
+      "ovl-overlay-poi-services-poi-services"
+    ],
+    "poiTransport": [
+      "ovl-overlay-poi-transport-poi-transport"
+    ],
+    "railways": [
+      "ovl-overlay-railways-railway-transit",
+      "ovl-overlay-railways-railway-service",
+      "ovl-overlay-railways-railway-base",
+      "ovl-overlay-railways-railway-ties"
+    ],
+    "roadLabels": [
+      "ovl-overlay-road-labels-road-name"
+    ],
+    "roads": [
+      "ovl-overlay-roads-road-minor-casing",
+      "ovl-overlay-roads-road-minor",
+      "ovl-overlay-roads-road-path",
+      "ovl-overlay-roads-road-secondary-tertiary-casing",
+      "ovl-overlay-roads-road-secondary-tertiary",
+      "ovl-overlay-roads-road-trunk-primary-casing",
+      "ovl-overlay-roads-road-trunk-primary",
+      "ovl-overlay-roads-road-motorway-casing",
+      "ovl-overlay-roads-road-motorway"
+    ],
+    "water": [
+      "ovl-overlay-water-water",
+      "ovl-overlay-water-water-intermittent",
+      "ovl-overlay-water-waterway-river",
+      "ovl-overlay-water-waterway-stream-canal"
+    ]
+  },
+  "defaultVisible": [
+    "railways",
+    "roads"
+  ]
+}

@@ -1,0 +1,26 @@
+:root {
+    --blue-first-color: #008DD2;
+    --blue-second-color: #FEFEFE;
+    --blue-third-color: #00A0E3;
+
+    --red-first-color: #970e0e;
+    --red-second-color: #FEFEFE;
+    --red-third-color: #c20b0b;
+}
+
+/* Blue */
+.icon__blue .stop-color__first-color {stop-color: var(--blue-first-color);}
+.icon__blue .stop-color__second-color {stop-color: var(--blue-second-color);}
+.icon__blue .stop-color__third-color {stop-color: var(--blue-third-color);}
+.icon__blue .fill__first-color {fill: var(--blue-first-color);}
+.icon__blue .fill__third-color {fill: var(--blue-third-color);}
+.icon__blue .stroke__first-color {stroke: var(--blue-first-color);}
+
+/* Red */
+.icon__red .stop-color__first-color {stop-color: var(--red-first-color);}
+.icon__red .stop-color__second-color {stop-color: var(--red-second-color);}
+.icon__red .stop-color__third-color {stop-color: var(--red-third-color);}
+.icon__red .fill__first-color {fill: var(--red-first-color);}
+.icon__red .fill__third-color {fill: var(--red-third-color);}
+.icon__red .stroke__first-color {stroke: var(--red-first-color);}
+
