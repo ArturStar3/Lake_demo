@@ -24,13 +24,19 @@ services:
         target: /app/media
         bind:
           create_host_path: false
+      - type: bind
+        source: ${DB_DUMP_PATH:?Set DB_DUMP_PATH in .env.demo}
+        target: /restore/db_dump
+        read_only: true
+        bind:
+          create_host_path: false
       - pgdata:/var/lib/postgresql/data
     networks:
       integration:
         aliases:
           - infolake-demo
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/tiles/styles/infolake-unified/style.json && wget -q -O /dev/null http://127.0.0.1/api/v1/"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/tiles/styles/infolake-unified/style.json && wget -q -S -O /dev/null http://127.0.0.1/api/v1/ 2>&1 | grep -q 'HTTP/'"]
       interval: 30s
       timeout: 15s
       retries: 3

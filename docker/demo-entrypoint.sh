@@ -17,6 +17,7 @@ export ALLOWED_HOSTS="${ALLOWED_HOSTS:-localhost,127.0.0.1,infolake-demo}"
 export CORS_ALLOWED_ORIGINS="${CORS_ALLOWED_ORIGINS:-$FRONTEND_URL}"
 export CORS_ALLOW_ALL_ORIGINS=False
 export DEM_DATA_DIR="${DEM_DATA_DIR:-/app/dem_data/glo-90}"
+IS_EMPTY_DB="${IS_EMPTY_DB:-${is_empty_db:-0}}"
 
 PG_BIN=/usr/lib/postgresql/17/bin
 
@@ -91,6 +92,56 @@ hba_marker="# infolake-demo: docker published ports and integration network"
 if [ -f "$hba_file" ] && ! grep -qF "$hba_marker" "$hba_file"; then
     printf '\n%s\nhost all all all scram-sha-256\n' "$hba_marker" >> "$hba_file"
 fi
+
+restore_database_from_dump() {
+    if [ ! -f /restore/db_dump ] || [ ! -r /restore/db_dump ]; then
+        echo "IS_EMPTY_DB=1 requires DB_DUMP_PATH to be mounted as a readable regular file at /restore/db_dump" >&2
+        exit 1
+    fi
+
+    # Validate the archive before touching the current database.  This avoids
+    # losing an existing database when a path points to a directory or an
+    # incomplete/non-PostgreSQL backup.
+    if ! "$PG_BIN/pg_restore" -l /restore/db_dump >/dev/null; then
+        echo "IS_EMPTY_DB=1 requires a valid pg_dump archive at DB_DUMP_PATH" >&2
+        exit 1
+    fi
+
+    echo "IS_EMPTY_DB=1: replacing database '$DB_NAME' from the configured dump"
+    start_postgres 127.0.0.1
+    PGPASSWORD="$POSTGRES_PASSWORD" psql -h 127.0.0.1 -U postgres -d postgres -v ON_ERROR_STOP=1 \
+        -v db_user="$DB_USER" -v db_name="$DB_NAME" <<'SQL'
+SELECT pg_terminate_backend(pid)
+FROM pg_stat_activity
+WHERE datname = :'db_name' AND pid <> pg_backend_pid();
+DROP DATABASE IF EXISTS :"db_name";
+CREATE DATABASE :"db_name"
+    OWNER :"db_user"
+    ENCODING 'UTF8'
+    LC_COLLATE 'C.UTF-8'
+    LC_CTYPE 'C.UTF-8'
+    TEMPLATE template0;
+SQL
+    PGPASSWORD="$DB_PASSWORD" "$PG_BIN/pg_restore" \
+        -h 127.0.0.1 \
+        -U "$DB_USER" \
+        -d "$DB_NAME" \
+        --no-owner \
+        --no-acl \
+        --exit-on-error \
+        --single-transaction \
+        /restore/db_dump
+    stop_postgres
+}
+
+case "$IS_EMPTY_DB" in
+    0|'') ;;
+    1) restore_database_from_dump ;;
+    *)
+        echo "IS_EMPTY_DB must be 0 or 1, received: $IS_EMPTY_DB" >&2
+        exit 1
+        ;;
+esac
 
 if [ "${DEMO_MAINTENANCE:-0}" = "1" ]; then
     echo "Maintenance mode: PostgreSQL only; migrations, seed and HTTP services are disabled."

@@ -56,13 +56,16 @@ COPY --from=frontend-build /frontend/dist /usr/share/nginx/html
 COPY docker/demo-nginx.conf /etc/nginx/conf.d/demo.conf
 COPY docker/supervisord-demo.conf /etc/supervisord.conf
 COPY docker/demo-entrypoint.sh /usr/local/bin/demo-entrypoint
+COPY docker/start-nginx-after-upstreams.sh /usr/local/bin/start-nginx-after-upstreams
 
 RUN rm -f /data/data/map.mbtiles \
     && rm -f /etc/nginx/sites-enabled/default \
-    && mkdir -p /app/media /app/staticfiles /app/dem_data/glo-90 "$PGDATA" /run/nginx \
+    && mkdir -p /app/media /app/staticfiles /app/dem_data/glo-90 "$PGDATA" /run/nginx /restore \
+    && touch /restore/db_dump \
     && chown -R postgres:postgres "$PGDATA" \
     && chmod +x /usr/local/bin/demo-entrypoint \
-    && sed -i 's/\r$//' /usr/local/bin/demo-entrypoint
+    && chmod +x /usr/local/bin/start-nginx-after-upstreams \
+    && sed -i 's/\r$//' /usr/local/bin/demo-entrypoint /usr/local/bin/start-nginx-after-upstreams
 
 EXPOSE 80 5432
 VOLUME ["/var/lib/postgresql/data"]
