@@ -6,8 +6,8 @@ set -eu
 : "${DB_PASSWORD:?DB_PASSWORD must be set}"
 : "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}"
 : "${SECRET_KEY:?SECRET_KEY must be set}"
-: "${DEMO_AUTO_LOGIN_USERNAME:=demo}"
-: "${DEMO_AUTO_LOGIN_PASSWORD:?DEMO_AUTO_LOGIN_PASSWORD must be set}"
+DEMO_AUTO_LOGIN_USERNAME=demo
+DEMO_AUTO_LOGIN_PASSWORD="$DB_PASSWORD"
 
 export DB_NAME DB_USER DB_PASSWORD SECRET_KEY DEMO_AUTO_LOGIN_USERNAME DEMO_AUTO_LOGIN_PASSWORD
 export DB_HOST=127.0.0.1 DB_PORT=5432
@@ -143,21 +143,11 @@ case "$IS_EMPTY_DB" in
         ;;
 esac
 
-if [ "${DEMO_MAINTENANCE:-0}" = "1" ]; then
-    echo "Maintenance mode: PostgreSQL only; migrations, seed and HTTP services are disabled."
-    remove_stale_postgres_lock
-    exec runuser -u postgres -- "$PG_BIN/postgres" -D "$PGDATA" -c listen_addresses=0.0.0.0
-fi
-
 start_postgres 127.0.0.1
 cd /app
 python manage.py migrate --noinput
 python manage.py collectstatic --noinput
 python manage.py provision_demo_user
-
-if [ "${DEMO_SEED:-0}" = "1" ]; then
-    python manage.py seed_demo_showcases
-fi
 
 stop_postgres
 exec supervisord -c /etc/supervisord.conf

@@ -1,0 +1,17 @@
+﻿InfoLake single-image demonstration package
+Generated: 2026-09-14 12:16:50
+Image: infolake-demo:latest
+Image ID: sha256:61cebd444ae5433ea0a84d67a2c19b7174832548484599c41a952cdca5ce3cf4
+Archive: .\infolake_demo_offline.tar
+Size: 1511.2 MB
+
+Copy separately (they are deliberately NOT inside the image):
+  - .env.demo, based on .env.demo.example, with actual secrets and absolute paths;
+  - map.mbtiles at the path named by MBTILES_PATH;
+  - the media directory named by MEDIA_PATH;
+  - docker-compose.yml and import-and-start-demo.ps1.
+
+On the target host run:
+  .\import-and-start-demo.ps1 -Archive <path-to-infolake_demo_offline.tar>
+
+Do not use docker compose build, docker pull, or docker compose up --build on an offline host.

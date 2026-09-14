@@ -19,8 +19,6 @@ Copy-Item .\.env.demo.example .\.env.demo
 - кавычки не ставить
 - списки через запятую без пробелов: `localhost,127.0.0.1,infolake-demo`
 - origins со схемой и портом: `http://localhost:8080`
-- `DEMO_MAINTENANCE=0` — обычный показ, `1` — только PostgreSQL
-- `DEMO_SEED=1` только на первый запуск с пустой БД, потом `0`
 - `IS_EMPTY_DB=1` только на один старт с restore из `DB_DUMP_PATH`, потом `0`
 
 Compose читает файл только так: `--env-file .env.demo`. Команды без этого флага не запускать. `restart` новые значения не подхватывает — нужен `--force-recreate`.

@@ -378,7 +378,7 @@ export default function Formular({ onMapFullscreenChange }) {
         if (canReadSituations) fetchSituations?.();
     }, [canReadSituations, demoPlayer, fetchEvents, fetchSituations, refreshDemoScenarios]);
 
-    const handlePlayDemo = useCallback(async (scenario, { openStudioWhenEmpty = true } = {}) => {
+    const handlePlayDemo = useCallback(async (scenario) => {
         setDemoStudioOpen(false);
         setDemoStudioPreviewHide(null);
         setDemoTextEditSession(null);
@@ -393,10 +393,8 @@ export default function Formular({ onMapFullscreenChange }) {
                 next = list.find((item) => item.is_default) || list[0] || null;
             }
         }
-        if (!next?.sequence?.length && !next?.stages?.length) {
-            if (openStudioWhenEmpty) setDemoStudioOpen(true);
-            return;
-        }
+        // No default scenario means no playback: keep the ordinary map open.
+        if (!next?.sequence?.length && !next?.stages?.length) return;
         demoPlayer.start(next);
     }, [defaultScenario, demoPlayer, demoScenarios, refreshDemoScenarios]);
 
@@ -405,7 +403,7 @@ export default function Formular({ onMapFullscreenChange }) {
             return undefined;
         }
         autoDemoStartedRef.current = true;
-        handlePlayDemo(undefined, { openStudioWhenEmpty: false }).catch(() => {
+        handlePlayDemo(undefined).catch(() => {
             // A transient API error may be retried after an explicit user action.
             autoDemoStartedRef.current = false;
         });

@@ -178,9 +178,16 @@ class Command(BaseCommand):
         else:
             kz_targets = Target.objects.none()
 
-        showcase = (astana | almaty | rls_other | kz_targets).distinct()
+        candidate_target_ids = (
+            _ids(astana)
+            + _ids(almaty)
+            + _ids(rls_other)
+            + _ids(kz_targets)
+        )
+        showcase = Target.objects.filter(id__in=candidate_target_ids).order_by('title')
         if showcase.count() < 3:
-            showcase = Target.objects.all()[:8]
+            showcase = Target.objects.all().order_by('title')
+        showcase = showcase[:8]
 
         events = Event.objects.filter(
             Q(title__icontains='Казахстан')
